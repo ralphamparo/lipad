@@ -115,6 +115,11 @@ async function load() {
   const id = ++reqId;
   renderWhen();
   $("grid").innerHTML = `<li class="loading">Searching ${$("origin").value === "ALL" ? "all Philippine airports" : $("origin").selectedOptions[0].textContent}, departing ${rangeLabel()}…</li>` + '<li class="skeleton"></li>'.repeat(8);
+  // Clear the second grid too, or the last search's results sit below the skeletons.
+  $("grid2").innerHTML = "";
+  $("adMid").hidden = true;
+  $("meta").textContent = ""; // the old summary describes the previous search, not this one
+  $("hotels").hidden = true;
   $("empty").hidden = true;
   const r = range();
   const p = new URLSearchParams({ ...baseParams(), ...(r && { from: r.from, to: r.to }), ...(r && r.returnBy && { returnBy: r.returnBy }) });
@@ -683,6 +688,9 @@ function adsenseSlot(box, slot) {
 }
 
 async function initAds() {
+  // Record the context we're asking for, so the first render doesn't ask again and
+  // double-count every sponsor's impressions.
+  adsKey = (state.region === "All" ? "" : state.region) + "|" + (state.focusDest || "");
   const slotIds = { top: CONFIG.adsenseSlotTop, mid: CONFIG.adsenseSlotMid, bottom: CONFIG.adsenseSlotBottom };
   let own = {};
   try {
