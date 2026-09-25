@@ -510,9 +510,10 @@ http.createServer((req, res) => {
   // Only serve the site's own web files: never server.js, .env or other dotfiles, docs,
   // the ad database in data/, or any other server-side code.
   const name = path.basename(file);
-  const blocked = ["server.js", "ads-server.js", "config.js.example"];
+  // .json is a response type for the API, never a file to hand out (package.json, lockfiles, ad data).
+  const blocked = ["server.js", "ads-server.js"];
   if (!file.startsWith(ROOT + path.sep) || name.startsWith(".") || blocked.includes(name) ||
-      p.startsWith("/data/") || !TYPES[path.extname(name)]) {
+      p.startsWith("/data/") || path.extname(name) === ".json" || !TYPES[path.extname(name)]) {
     res.writeHead(403).end("Forbidden");
     return;
   }
