@@ -206,3 +206,8 @@ input[type=color] { padding: 2px; height: 38px; }
 .alert-msg { font-size: 14px; }
 .alert-msg.bad { color: #c0392b; }
 .alert-msg.good { color: var(--good); font-weight: 600; }
+.alert-box.big { margin: 24px 0; }
+.alert-box .field { min-width: 150px; }
+.alert-box input[type=text] { font: inherit; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; min-width: 240px; }
+.prose ul { padding-left: 20px; }
+.prose li { margin-bottom: 8px; }

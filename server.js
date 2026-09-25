@@ -9,18 +9,20 @@ const http = require("http");
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
-const ownAds = require("./ads-server");
-const fareAlerts = require("./alerts-server");
 
 const ROOT = __dirname;
 const PORT = process.env.PORT || process.argv[2] || 4325;
 // Optional local secrets file (KEY=value per line, gitignored); real environment variables win.
+// This has to run before the modules below, which read their settings as they load.
 try {
   for (const line of fs.readFileSync(path.join(ROOT, ".env"), "utf8").split(/\r?\n/)) {
     const m = /^\s*([A-Z_][A-Z0-9_]*)\s*=\s*(.*?)\s*$/.exec(line);
     if (m && !(m[1] in process.env)) process.env[m[1]] = m[2].replace(/^(['"])(.*)\1$/, "$2");
   }
 } catch { /* no .env file */ }
+
+const ownAds = require("./ads-server");
+const fareAlerts = require("./alerts-server");
 
 const TOKEN = process.env.TP_TOKEN || "";
 const MARKER = process.env.TP_MARKER || "";
@@ -414,6 +416,18 @@ async function getSales(params) {
   return { demo: sweep.demo, error: sweep.error, updatedAt: sweep.at, params, deals: sales.slice(0, 120) };
 }
 
+// Every destination we currently hold fares for — the list behind the alert form's picker.
+async function getDestinations(params) {
+  const { rows } = await getSweep(params);
+  const seen = new Map();
+  for (const d of rows) {
+    const found = seen.get(d.destination);
+    if (!found) seen.set(d.destination, { code: d.destination, name: d.destinationName, country: d.countryName, from: d.price });
+    else if (d.price < found.from) found.from = d.price;
+  }
+  return { destinations: [...seen.values()].sort((a, b) => a.name.localeCompare(b.name)) };
+}
+
 // Cheapest known fare per departure month ("YYYY-MM") or week (Monday "YYYY-MM-DD").
 async function getLows(params, unit) {
   const { rows } = await getSweep(params);
@@ -563,6 +577,7 @@ http.createServer((req, res) => {
   if (url.pathname === "/api/deals") return sendJson(res, getDeals(parseParams(url)));
   if (url.pathname === "/api/lows") return sendJson(res, getLows(parseParams(url), url.searchParams.get("unit") === "week" ? "week" : "month"));
   if (url.pathname === "/api/sales") return sendJson(res, getSales(parseParams(url)));
+  if (url.pathname === "/api/destinations") return sendJson(res, getDestinations(parseParams(url)));
   if (url.pathname === "/api/ads") {
     const placements = (url.searchParams.get("placements") || "").split(",").filter((p) => ownAds.PLACEMENTS.includes(p));
     return sendJson(res, Promise.resolve(ownAds.serve({

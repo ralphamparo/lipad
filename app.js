@@ -143,7 +143,8 @@ function render() {
   $("heroBudget").textContent = anyBudget ? "₱5,000" : peso(max);
 
   const q = $("q").value.trim().toLowerCase();
-  const matches = (d) => !q || `${d.destinationName} ${d.countryName} ${d.destination}`.toLowerCase().includes(q);
+  const aliasCode = (window.LIPAD_ALIASES || {})[q];
+  const matches = (d) => !q || (aliasCode ? d.destination === aliasCode : `${d.destinationName} ${d.countryName} ${d.destination}`.toLowerCase().includes(q));
   // A search that narrows to 1–3 destinations shows every fare to them (all dates and airports), not just the cheapest.
   const focus = q ? [...new Set(state.deals.filter(matches).map((d) => d.destination))] : [];
   const focused = focus.length > 0 && focus.length <= 3;
