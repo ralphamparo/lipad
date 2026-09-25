@@ -523,7 +523,9 @@ http.createServer((req, res) => {
   });
 }).listen(PORT, () => {
   // Hosts like Render publish the real address in an env var; locally it's just localhost.
-  const url = process.env.RENDER_EXTERNAL_URL || process.env.PUBLIC_URL || `http://localhost:${PORT}`;
+  const url = process.env.RENDER_EXTERNAL_URL || process.env.PUBLIC_URL ||
+    (process.env.RAILWAY_PUBLIC_DOMAIN && `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`) ||
+    `http://localhost:${PORT}`;
   console.log(`Lipad on ${url} (${TOKEN ? "live Travelpayouts prices" : "sample prices — set TP_TOKEN for live"}` +
     `${MARKER ? `, marker ${MARKER}` : ", no TP_MARKER: bookings earn nothing"}` +
     `${ADMIN_TOKEN ? "" : ", admin disabled"})`);
