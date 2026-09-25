@@ -395,11 +395,15 @@ async function getSales(params) {
     routes.get(key).push(d);
   }
 
+  const { from, to } = params;
   const sales = [];
   for (const fares of routes.values()) {
     if (fares.length < MIN_SAMPLES) continue;
+    // The baseline is the route's whole history; the sale fare has to fall inside the dates asked for.
     const typical = median(fares.map((f) => f.price));
-    const best = fares.reduce((a, b) => (b.price < a.price ? b : a));
+    const inRange = from ? fares.filter((f) => f.departAt.slice(0, 10) >= from && f.departAt.slice(0, 10) <= to) : fares;
+    if (!inRange.length) continue;
+    const best = inRange.reduce((a, b) => (b.price < a.price ? b : a));
     const discount = 1 - best.price / typical;
     if (discount < MIN_DISCOUNT) continue;
     sales.push({ ...best, nights: nightsOf(best), typical: Math.round(typical), discount: +(discount * 100).toFixed(0), samples: fares.length });

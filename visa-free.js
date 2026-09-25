@@ -15,6 +15,22 @@ const KINDS = {
 
 const state = { kind: "all", fares: {}, sales: {}, loading: true };
 
+const pad = (n) => String(n).padStart(2, "0");
+const monthEnd = (ym) => { const d = new Date(+ym.slice(0, 4), +ym.slice(5, 7), 0); return `${ym}-${pad(d.getDate())}`; };
+const fmtDay = (stamp) => {
+  const [y, m, d] = stamp.slice(0, 10).split("-").map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString("en-PH", { weekday: "short", day: "numeric", month: "short" });
+};
+// Next 12 months in the "When" picker.
+(() => {
+  const now = new Date();
+  for (let i = 0; i < 12; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() + i, 1);
+    const value = `${d.getFullYear()}-${pad(d.getMonth() + 1)}`;
+    $("month").insertAdjacentHTML("beforeend", `<option value="${value}">${d.toLocaleDateString("en-PH", { month: "long", year: "numeric" })}</option>`);
+  }
+})();
+
 function render() {
   const counts = { all: 0 };
   const rows = VISA.countries.map((c) => ({ ...c, fare: state.fares[c.code] || null, sale: state.sales[c.code] || null }));
@@ -35,6 +51,7 @@ function render() {
   $("grid").innerHTML = shown.map((r) => {
     const k = KINDS[r.kind];
     const stay = r.days ? `Stay up to ${r.days} days` : "Length of stay varies";
+    const flight = r.fare ? `<div class="dates">${fmtDay((r.sale || r.fare).departAt)} · ${esc((r.sale || r.fare).destinationName)}${(r.sale || r.fare).stops === 0 ? " · direct" : ""}</div>` : "";
     const fare = r.sale
       ? `<div class="price">${peso(r.sale.price)}<small><s>${peso(r.sale.typical)}</s> from ${esc(r.sale.origin)}</small></div>`
       : r.fare
@@ -54,6 +71,7 @@ function render() {
           </div>
           ${fare}
         </div>
+        ${flight}
         <div class="route"><span class="tag ${r.kind === "free" ? "direct" : ""}">${k.label}</span><span>${esc(r.note || k.blurb)}</span></div>
       </div>
       <div class="deal-actions">${link}</div>
@@ -73,10 +91,12 @@ async function loadFares() {
   state.loading = true;
   render();
   const origin = $("origin").value;
+  const month = $("month").value;
+  const when = month ? `&from=${month}-01&to=${monthEnd(month)}` : "";
   const get = (path) => fetch(`${API}${path}`).then((r) => r.json()).catch(() => ({ deals: [] }));
   const [deals, sales] = await Promise.all([
-    get(`/api/deals?origin=${origin}&trip=oneway`),
-    get(`/api/sales?origin=${origin}&trip=oneway`),
+    get(`/api/deals?origin=${origin}&trip=oneway${when}`),
+    get(`/api/sales?origin=${origin}&trip=oneway${when}`),
   ]);
   // Cheapest fare per country, not per city.
   const best = {};
@@ -102,6 +122,6 @@ $("kinds").addEventListener("click", (e) => {
 });
 $("withFares").addEventListener("change", render);
 $("onSale").addEventListener("change", render);
-$("origin").addEventListener("change", loadFares);
+["origin", "month"].forEach((id) => $(id).addEventListener("change", loadFares));
 
 loadFares();
