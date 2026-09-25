@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Seat Sales Right Now — Flights from the Philippines Below Their Usual Price | Lipad</title>
+  <meta name="description" content="Live seat sales from Philippine airports: fares that are well below what that route normally costs, with the usual price shown so you can judge the deal.">
+  <link rel="icon" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#0b3d91">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="hero">
+    <div class="wrap">
+      <div class="brandbar">
+        <a class="brand" href="./">✈ Lipad</a>
+        <span class="brandlinks"><a href="visa-free.html">Visa-free countries</a><a href="./">All deals</a></span>
+      </div>
+      <h1>Seat sales right now</h1>
+      <p class="lede">Fares well below what that route usually costs — not just cheap routes, but routes that are cheap <em>today</em>.</p>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="controls" aria-label="Filters">
+      <label class="field">
+        <span>Flying from</span>
+        <select id="origin">
+          <option value="ALL">All PH airports</option>
+          <option value="MNL">Manila (MNL)</option>
+          <option value="CEB">Cebu (CEB)</option>
+          <option value="CRK">Clark (CRK)</option>
+          <option value="DVO">Davao (DVO)</option>
+          <option value="ILO">Iloilo (ILO)</option>
+          <option value="KLO">Kalibo (KLO)</option>
+          <option value="PPS">Puerto Princesa (PPS)</option>
+          <option value="TAG">Bohol–Panglao (TAG)</option>
+        </select>
+      </label>
+      <div class="field">
+        <span>Trip</span>
+        <div class="seg" role="radiogroup" id="trip">
+          <button type="button" role="radio" data-v="oneway" aria-checked="true">One-way</button>
+          <button type="button" role="radio" data-v="round" aria-checked="false">Round trip</button>
+        </div>
+      </div>
+      <label class="check"><input type="checkbox" id="direct"> Direct only</label>
+    </section>
+
+    <p class="meta" id="meta">Finding sales…</p>
+    <ol class="grid" id="grid"></ol>
+    <p class="empty" id="empty" hidden></p>
+
+    <div class="notice">
+      <strong>How this works.</strong> For every route we compare today's cheapest fare with the middle price of
+      everything we've seen on that route. A route only appears here if the gap is at least 25% and we have
+      enough fares to judge it. "Usually" is that middle price, not an airline's list price.
+    </div>
+  </main>
+
+  <footer class="wrap foot">
+    <p>Prices are the lowest recently found by travellers and can change before you book. Some links are affiliate links.</p>
+    <p><a href="./">Flight deals</a> · <a href="visa-free.html">Visa-free countries</a> · <a href="privacy.html">Privacy policy</a></p>
+  </footer>
+
+  <script src="config.js"></script>
+  <script src="sales.js"></script>
+</body>
+</html>

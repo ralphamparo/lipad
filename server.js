@@ -371,6 +371,44 @@ async function getDeals(params) {
   return { demo: sweep.demo, error: sweep.error, updatedAt: sweep.at, params, deals };
 }
 
+// ---------- seat sales ----------
+// "Cheap" only means something against what a route normally costs: Manila–Tokyo at ₱6,000 is a
+// sale, Manila–Cebu at ₱6,000 is a rip-off. We compare each route's cheapest fare with the median
+// of every fare we hold for it, and call the big gaps sales.
+const MIN_SAMPLES = 4; // fewer than this and the "typical" price is guesswork
+const MIN_DISCOUNT = 0.25;
+
+function median(nums) {
+  const s = [...nums].sort((a, b) => a - b);
+  const mid = s.length >> 1;
+  return s.length % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2;
+}
+
+async function getSales(params) {
+  const sweep = await getSweep(params);
+  const routes = new Map();
+  for (const d of sweep.rows) {
+    if (!fitsStay(d, params)) continue;
+    const key = d.origin + d.destination;
+    if (!routes.has(key)) routes.set(key, []);
+    routes.get(key).push(d);
+  }
+
+  const sales = [];
+  for (const fares of routes.values()) {
+    if (fares.length < MIN_SAMPLES) continue;
+    const typical = median(fares.map((f) => f.price));
+    const best = fares.reduce((a, b) => (b.price < a.price ? b : a));
+    const discount = 1 - best.price / typical;
+    if (discount < MIN_DISCOUNT) continue;
+    sales.push({ ...best, nights: nightsOf(best), typical: Math.round(typical), discount: +(discount * 100).toFixed(0), samples: fares.length });
+  }
+
+  // Biggest drops first, and only the ones worth a traveller's attention.
+  sales.sort((a, b) => b.discount - a.discount || a.price - b.price);
+  return { demo: sweep.demo, error: sweep.error, updatedAt: sweep.at, params, deals: sales.slice(0, 120) };
+}
+
 // Cheapest known fare per departure month ("YYYY-MM") or week (Monday "YYYY-MM-DD").
 async function getLows(params, unit) {
   const { rows } = await getSweep(params);
@@ -491,6 +529,7 @@ http.createServer((req, res) => {
   const url = new URL(req.url, "http://localhost");
   if (url.pathname === "/api/deals") return sendJson(res, getDeals(parseParams(url)));
   if (url.pathname === "/api/lows") return sendJson(res, getLows(parseParams(url), url.searchParams.get("unit") === "week" ? "week" : "month"));
+  if (url.pathname === "/api/sales") return sendJson(res, getSales(parseParams(url)));
   if (url.pathname === "/api/ads") {
     const placements = (url.searchParams.get("placements") || "").split(",").filter((p) => ownAds.PLACEMENTS.includes(p));
     return sendJson(res, Promise.resolve(ownAds.serve({

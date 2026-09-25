@@ -181,3 +181,10 @@ input[type=color] { padding: 2px; height: 38px; }
 .deal.visa .price.none { color: var(--muted); }
 .deal.visa .route { align-items: baseline; }
 .deal.visa .deal-actions a { width: 100%; }
+
+/* seat sales */
+.deal.sale { position: relative; border-top-color: var(--r-ea); }
+.sale-flag { position: absolute; top: 10px; right: 12px; font-size: 11px; font-weight: 800; letter-spacing: .02em; color: #fff; background: #c0392b; border-radius: 999px; padding: 2px 9px; }
+.deal.sale .deal-top { padding-top: 16px; }
+.deal.sale .price small s { opacity: .8; }
+.saving { font-size: 13px; font-weight: 600; color: var(--good); }
