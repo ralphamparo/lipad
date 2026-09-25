@@ -184,6 +184,7 @@ function render() {
   const names = [...new Set(shown.map((d) => d.destinationName))].join(" & ");
   renderHotels(allFares ? shown[0] : null);
   state.focusDest = allFares && shown[0] ? shown[0].destination : "";
+  renderAlertBox(cheapest, allFares && shown[0] ? shown[0].destinationName : "");
   promoDeal = (allFares && shown[0]) || shown[0] || null;
   refreshAdsFor(state.region === "All" ? "" : state.region, state.focusDest);
   $("meta").textContent = shown.length
@@ -575,6 +576,51 @@ $("adults").addEventListener("change", () => {
   $("budget").value = String(wasAny ? $("budget").max : perPerson * adults());
   render();
 });
+
+// ---------- fare alerts ----------
+// The form describes whatever the visitor is looking at right now, and suggests a target price
+// just under today's cheapest fare — the number they'd actually be pleased to see.
+function renderAlertBox(cheapest, focusName) {
+  const box = $("alertBox");
+  if (!state.alertsOn || !Number.isFinite(cheapest)) { box.hidden = true; return; }
+  const where = focusName || (state.region !== "All" ? state.region : "anywhere");
+  const from = $("origin").value === "ALL" ? "the Philippines" : $("origin").selectedOptions[0].textContent;
+  $("alertTitle").textContent = `Email me when ${where} gets cheaper`;
+  $("alertWhat").textContent = `We'll watch ${state.trip === "round" ? "round-trip" : "one-way"} fares from ${from} and email you at most once every few days. Unsubscribe in one click.`;
+  if (!$("alertPrice").dataset.touched) $("alertPrice").value = Math.max(500, Math.floor(cheapest * 0.9 / 100) * 100);
+  box.hidden = false;
+}
+$("alertPrice").addEventListener("input", () => { $("alertPrice").dataset.touched = "1"; });
+
+$("alertBox").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const msg = $("alertMsg");
+  msg.className = "alert-msg";
+  msg.textContent = "Sending…";
+  try {
+    const body = {
+      email: $("alertEmail").value.trim(),
+      origin: $("origin").value,
+      dest: state.focusDest || "",
+      trip: state.trip,
+      maxPrice: $("alertPrice").value,
+    };
+    const res = await fetch(API + "/api/alerts", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "That didn't work.");
+    msg.className = "alert-msg good";
+    msg.textContent = data.message;
+    $("alertBox").reset();
+  } catch (err) {
+    msg.className = "alert-msg bad";
+    msg.textContent = err.message;
+  }
+});
+
+// Only show the form if the server can actually send email.
+fetch(API + "/api/alerts/status").then((r) => r.json()).then((s) => { state.alertsOn = !!s.enabled; }).catch(() => {});
 
 // ---------- installable app shell ----------
 if ("serviceWorker" in navigator && location.protocol !== "file:") {

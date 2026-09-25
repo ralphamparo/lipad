@@ -18,8 +18,13 @@
     <div class="wrap">
       <div class="brandbar">
         <a class="brand" href="./">✈ Lipad</a>
-        <span class="brandlinks"><a href="sales.html">Seat sales</a><a href="visa-free.html">Visa-free countries</a><button type="button" id="install" class="install" hidden>Install app</button></span>
+        <button type="button" id="install" class="install" hidden>Install app</button>
       </div>
+      <nav class="tabs" aria-label="Sections">
+        <a href="./" class="tab on" aria-current="page">✈ Flight deals</a>
+        <a href="sales.html" class="tab">🔻 Seat sales</a>
+        <a href="visa-free.html" class="tab">🛂 Visa-free</a>
+      </nav>
       <h1>Where can <span class="accent" id="heroBudget">₱5,000</span> take you?</h1>
       <p class="lede">The cheapest flights leaving the Philippines right now — every destination, sorted by price.</p>
     </div>
@@ -125,6 +130,15 @@
     <div class="ad-slot" id="adMid" hidden></div>
     <ol class="grid" id="grid2" aria-live="polite"></ol>
     <div class="ad-slot" id="adBottom" hidden></div>
+    <form class="alert-box" id="alertBox" hidden>
+      <h2 id="alertTitle">Get an email when this gets cheaper</h2>
+      <label class="field"><span>Your email</span><input type="email" id="alertEmail" required placeholder="you@example.com"></label>
+      <label class="field narrow"><span>Tell me under</span><input type="number" id="alertPrice" min="500" step="100" required></label>
+      <button class="primary" type="submit">Create alert</button>
+      <p class="hint" id="alertWhat"></p>
+      <p class="alert-msg" id="alertMsg"></p>
+    </form>
+
     <p class="empty" id="empty" hidden>No flights match those filters. Try raising your budget or picking “Anytime”.</p>
   </main>
 

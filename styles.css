@@ -188,3 +188,21 @@ input[type=color] { padding: 2px; height: 38px; }
 .deal.sale .deal-top { padding-top: 16px; }
 .deal.sale .price small s { opacity: .8; }
 .saving { font-size: 13px; font-weight: 600; color: var(--good); }
+
+/* section tabs */
+.tabs { display: flex; gap: 6px; margin-top: 18px; overflow-x: auto; scrollbar-width: none; }
+.tabs::-webkit-scrollbar { display: none; }
+.tab { flex: none; font-size: 14px; font-weight: 600; color: rgba(255, 255, 255, .82); text-decoration: none; padding: 8px 15px; border-radius: 999px; border: 1px solid rgba(255, 255, 255, .28); white-space: nowrap; }
+.tab:hover { background: rgba(255, 255, 255, .14); color: #fff; }
+.tab.on { background: #fff; color: #0b3d91; border-color: #fff; box-shadow: 0 2px 10px rgba(0, 0, 0, .15); }
+.hero h1 { margin-top: 22px; }
+
+/* fare alert signup */
+.alert-box { display: flex; flex-wrap: wrap; gap: 12px 16px; align-items: end; background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px; margin: 14px 0; box-shadow: var(--shadow); }
+.alert-box h2 { font-size: 16px; margin: 0; flex-basis: 100%; }
+.alert-box p.hint { margin: 0; flex-basis: 100%; font-size: 13px; color: var(--muted); }
+.alert-box input[type=email], .alert-box input[type=number] { font: inherit; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; }
+.alert-box input[type=email] { min-width: 220px; }
+.alert-msg { font-size: 14px; }
+.alert-msg.bad { color: #c0392b; }
+.alert-msg.good { color: var(--good); font-weight: 600; }

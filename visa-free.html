@@ -16,8 +16,12 @@
     <div class="wrap">
       <div class="brandbar">
         <a class="brand" href="./">✈ Lipad</a>
-        <span class="brandlinks"><a href="sales.html">Seat sales</a><a class="install" href="./">All flight deals →</a></span>
-      </div>
+              </div>
+      <nav class="tabs" aria-label="Sections">
+        <a href="./" class="tab">✈ Flight deals</a>
+        <a href="sales.html" class="tab">🔻 Seat sales</a>
+        <a href="visa-free.html" class="tab on" aria-current="page">🛂 Visa-free</a>
+      </nav>
       <h1>Where can a Philippine passport go?</h1>
       <p class="lede">Countries you can enter without arranging a visa first — sorted by what the flight costs today.</p>
     </div>
@@ -41,6 +45,7 @@
         <span>Entry type</span>
         <div class="chips" id="kinds"></div>
       </div>
+      <label class="check"><input type="checkbox" id="onSale"> 🔥 On sale only</label>
       <label class="check"><input type="checkbox" id="withFares" checked> Only show places with a fare</label>
     </section>
 

@@ -10,6 +10,7 @@ const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
 const ownAds = require("./ads-server");
+const fareAlerts = require("./alerts-server");
 
 const ROOT = __dirname;
 const PORT = process.env.PORT || process.argv[2] || 4325;
@@ -473,6 +474,7 @@ function prewarm() {
 }
 prewarm();
 setInterval(prewarm, CACHE_MS - 60 * 1000).unref();
+fareAlerts.start(getDeals);
 
 // ---------- your own ads ----------
 // Constant-time compare so the password can't be guessed by timing the response.
@@ -525,6 +527,33 @@ async function handleAdmin(req, res, url) {
   }
 }
 
+// ---------- fare alerts ----------
+async function handleAlertSignup(req, res) {
+  const reply = (code, body) => {
+    res.writeHead(code, { "Content-Type": TYPES[".json"] });
+    res.end(JSON.stringify(body));
+  };
+  if (req.method !== "POST") return reply(405, { error: "Use POST." });
+  try {
+    await fareAlerts.subscribe(await readJsonBody(req, 8 * 1024));
+    reply(200, { ok: true, message: "Check your inbox and click the confirmation link." });
+  } catch (e) {
+    reply(400, { error: e.message });
+  }
+}
+
+// Small standalone page for the links inside alert emails.
+const alertPage = (found, confirmed) => `<!doctype html><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1"><title>Lipad fare alerts</title>
+<link rel="stylesheet" href="/styles.css"><body><main class="wrap prose" style="padding:48px 20px">
+<h1>${!found ? "That link has expired" : confirmed ? "Alert confirmed" : "Alert removed"}</h1>
+<p>${!found
+  ? "It may already have been used, or the alert was removed."
+  : confirmed
+    ? "We'll email you when a fare drops below your target. Prices move fast, so act quickly when one lands."
+    : "You won't get any more emails about this alert."}</p>
+<p><a href="/">← Back to Lipad</a></p></main>`;
+
 http.createServer((req, res) => {
   const url = new URL(req.url, "http://localhost");
   if (url.pathname === "/api/deals") return sendJson(res, getDeals(parseParams(url)));
@@ -542,6 +571,17 @@ http.createServer((req, res) => {
     return res.end();
   }
   if (url.pathname.startsWith("/api/admin/")) return void handleAdmin(req, res, url);
+  if (url.pathname === "/api/alerts/status") return sendJson(res, Promise.resolve({ enabled: fareAlerts.enabled() }));
+  if (url.pathname === "/api/alerts") return void handleAlertSignup(req, res);
+  if (url.pathname === "/alerts/confirm" || url.pathname === "/alerts/unsubscribe") {
+    const done = url.pathname.endsWith("confirm")
+      ? fareAlerts.confirm(url.searchParams.get("t"))
+      : fareAlerts.unsubscribe(url.searchParams.get("t"));
+    const confirmed = url.pathname.endsWith("confirm");
+    res.writeHead(done ? 200 : 404, { "Content-Type": TYPES[".html"] });
+    res.end(alertPage(done, confirmed));
+    return;
+  }
 
   let p = decodeURIComponent(url.pathname);
   if (p.endsWith("/")) p += "index.html";
