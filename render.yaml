@@ -16,5 +16,13 @@ services:
         sync: false
       - key: TP_MARKER
         sync: false
+      - key: ADMIN_TOKEN # password for /admin.html; pick a strong one
+        sync: false
       - key: NODE_VERSION
         value: "22"
+    # Sponsors and their view/click counts live in data/ads.json. Without a disk, Render wipes
+    # them on every deploy. Disks need a paid instance (Starter or above).
+    disk:
+      name: lipad-data
+      mountPath: /opt/render/project/src/data
+      sizeGB: 1
