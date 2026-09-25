@@ -12,7 +12,7 @@ window.LIPAD = {
   // website. A packaged Android/iOS build (Capacitor) sets this to the deployed URL instead,
   // e.g. "https://lipad.example.com".
   // Travelpayouts partner marker for hotel links (same marker as flights). Blank hides the hotel link.
-  hotelMarker: "",
+  hotelMarker: "778589",
 
   apiBase: "",
 
