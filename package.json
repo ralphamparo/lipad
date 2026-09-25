@@ -1,0 +1,12 @@
+{
+  "name": "lipad",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Cheapest flights from the Philippines to anywhere — Node server + web app, no dependencies.",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
