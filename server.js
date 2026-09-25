@@ -31,6 +31,11 @@ const ADMIN_TOKEN = process.env.ADMIN_TOKEN || "";
 const CACHE_MS = 30 * 60 * 1000;
 
 const PH_ORIGINS = ["MNL", "CEB", "CRK", "DVO", "ILO", "KLO", "PPS", "TAG"];
+// The only JavaScript the browser may download. Everything else (server modules) stays private.
+const CLIENT_SCRIPTS = new Set([
+  "app.js", "admin.js", "admob.js", "alerts.js", "aliases.js",
+  "config.js", "sales.js", "sw.js", "visa-data.js", "visa-free.js",
+]);
 const TYPES = {
   ".html": "text/html; charset=utf-8",
   ".css": "text/css; charset=utf-8",
@@ -608,9 +613,10 @@ http.createServer((req, res) => {
   // Only serve the site's own web files: never server.js, .env or other dotfiles, docs,
   // the ad database in data/, or any other server-side code.
   const name = path.basename(file);
+  // Scripts are served from an allowlist, so a new server-side file is never exposed by accident.
   // .json is a response type for the API, never a file to hand out (package.json, lockfiles, ad data).
-  const blocked = ["server.js", "ads-server.js"];
-  if (!file.startsWith(ROOT + path.sep) || name.startsWith(".") || blocked.includes(name) ||
+  const isServerCode = path.extname(name) === ".js" && !CLIENT_SCRIPTS.has(name);
+  if (!file.startsWith(ROOT + path.sep) || name.startsWith(".") || isServerCode ||
       p.startsWith("/data/") || path.extname(name) === ".json" || !TYPES[path.extname(name)]) {
     res.writeHead(403).end("Forbidden");
     return;
