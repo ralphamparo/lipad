@@ -521,4 +521,10 @@ http.createServer((req, res) => {
     res.writeHead(200, { "Content-Type": TYPES[path.extname(file)] || "application/octet-stream" });
     res.end(data);
   });
-}).listen(PORT, () => console.log(`Lipad on http://localhost:${PORT} (${TOKEN ? "live Travelpayouts prices" : "sample prices — set TP_TOKEN for live"})`));
+}).listen(PORT, () => {
+  // Hosts like Render publish the real address in an env var; locally it's just localhost.
+  const url = process.env.RENDER_EXTERNAL_URL || process.env.PUBLIC_URL || `http://localhost:${PORT}`;
+  console.log(`Lipad on ${url} (${TOKEN ? "live Travelpayouts prices" : "sample prices — set TP_TOKEN for live"}` +
+    `${MARKER ? `, marker ${MARKER}` : ", no TP_MARKER: bookings earn nothing"}` +
+    `${ADMIN_TOKEN ? "" : ", admin disabled"})`);
+});
