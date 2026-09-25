@@ -5,7 +5,9 @@ services:
   - type: web
     name: lipad
     runtime: node
-    plan: starter # free tier sleeps after ~15 min idle (slow first load); starter (~$7/mo) stays awake
+    # free needs no card, but sleeps after ~15 min idle and has no disk (see below).
+    # Change to "starter" (~$7/mo) for always-on plus the disk.
+    plan: free
     region: singapore # closest region to the Philippines
     buildCommand: "" # no dependencies to install
     startCommand: node server.js
@@ -20,9 +22,9 @@ services:
         sync: false
       - key: NODE_VERSION
         value: "22"
-    # Sponsors and their view/click counts live in data/ads.json. Without a disk, Render wipes
-    # them on every deploy. Disks need a paid instance (Starter or above).
-    disk:
-      name: lipad-data
-      mountPath: /opt/render/project/src/data
-      sizeGB: 1
+    # Sponsors and their view/click counts live in data/ads.json, which the free plan wipes on
+    # restart. On the starter plan, uncomment this to keep them:
+    # disk:
+    #   name: lipad-data
+    #   mountPath: /opt/render/project/src/data
+    #   sizeGB: 1
