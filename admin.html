@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ad manager — Lipad</title>
+  <meta name="robots" content="noindex">
+  <link rel="icon" href="icons/icon-192.png">
+  <link rel="stylesheet" href="styles.css">
+  <meta name="theme-color" content="#0b3d91">
+</head>
+<body>
+  <header class="hero">
+    <div class="wrap">
+      <div class="brandbar">
+        <a class="brand" href="./">✈ Lipad</a>
+        <button type="button" id="logout" class="install" hidden>Sign out</button>
+      </div>
+      <h1>Ad manager</h1>
+      <p class="lede">Your own sponsors — no ad network, no revenue share.</p>
+    </div>
+  </header>
+
+  <main class="wrap prose" style="max-width: 900px">
+    <form class="custom" id="login">
+      <label class="field grow"><span>Admin password</span><input type="password" id="pass" autocomplete="current-password"></label>
+      <button class="primary" type="submit">Sign in</button>
+      <p class="when-hint" id="loginHint">Set <code>ADMIN_TOKEN</code> on the server, then use it here.</p>
+    </form>
+
+    <section id="panel" hidden>
+      <h2>Sponsors</h2>
+      <div id="stats" class="meta"></div>
+      <table class="ads-table" id="table"></table>
+
+      <h2 id="formTitle">Add a sponsor</h2>
+      <form class="custom" id="adForm">
+        <input type="hidden" id="adId">
+        <label class="field"><span>Advertiser</span><input type="text" id="advertiser" placeholder="Cebu Dive Shop"></label>
+        <label class="field grow"><span>Headline</span><input type="text" id="headline" maxlength="80" required placeholder="Dive Malapascua from ₱3,500"></label>
+        <label class="field grow"><span>Body</span><input type="text" id="body" maxlength="160" placeholder="Two dives, gear and lunch included."></label>
+        <label class="field"><span>Button text</span><input type="text" id="cta" maxlength="30" placeholder="Book now"></label>
+        <label class="field grow"><span>Link</span><input type="url" id="url" required placeholder="https://..."></label>
+        <label class="field"><span>Image <em>optional, max 600 KB</em></span><input type="file" id="image" accept="image/*"></label>
+        <label class="field"><span>Background <em>optional</em></span><input type="color" id="bg" value="#ffffff"></label>
+        <fieldset class="field grow"><span>Where</span>
+          <div class="checks">
+            <label><input type="checkbox" name="placement" value="top"> Above results</label>
+            <label><input type="checkbox" name="placement" value="mid" checked> Between results</label>
+            <label><input type="checkbox" name="placement" value="bottom"> Below results</label>
+          </div>
+        </fieldset>
+        <label class="field grow"><span>Regions <em>blank = everywhere</em></span><input type="text" id="regions" placeholder="East Asia, Southeast Asia"></label>
+        <label class="field"><span>Destinations <em>blank = all</em></span><input type="text" id="destinations" placeholder="HKG, TYO"></label>
+        <label class="field"><span>Start <em>optional</em></span><input type="date" id="start"></label>
+        <label class="field"><span>End <em>optional</em></span><input type="date" id="end"></label>
+        <label class="field narrow"><span>Weight</span><input type="number" id="weight" min="1" max="100" value="1"></label>
+        <label class="check"><input type="checkbox" id="active" checked> Active</label>
+        <div class="presets">
+          <button class="primary" type="submit">Save sponsor</button>
+          <button type="button" class="chip" id="cancel" hidden>Cancel edit</button>
+          <span class="when-hint" id="formMsg"></span>
+        </div>
+      </form>
+    </section>
+  </main>
+
+  <script src="config.js"></script>
+  <script src="admin.js"></script>
+</body>
+</html>

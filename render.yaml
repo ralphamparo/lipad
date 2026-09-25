@@ -1,0 +1,20 @@
+# Render blueprint for Lipad (this repo is the app, so no rootDir needed). In Render: New → Blueprint → pick the repo → it reads this file.
+# TP_TOKEN and TP_MARKER are marked sync:false, so Render asks you to paste them in its dashboard
+# instead of them ever living in the repo.
+services:
+  - type: web
+    name: lipad
+    runtime: node
+    plan: starter # free tier sleeps after ~15 min idle (slow first load); starter (~$7/mo) stays awake
+    region: singapore # closest region to the Philippines
+    buildCommand: "" # no dependencies to install
+    startCommand: node server.js
+    healthCheckPath: /
+    autoDeploy: true
+    envVars:
+      - key: TP_TOKEN
+        sync: false
+      - key: TP_MARKER
+        sync: false
+      - key: NODE_VERSION
+        value: "22"

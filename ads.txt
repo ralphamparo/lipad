@@ -1,0 +1,7 @@
+# ads.txt — the website version of the same proof, for AdSense.
+#
+# 1. In AdSense: Sites → your site → Ads.txt, copy the line it gives you.
+# 2. Replace the example below with it (your own publisher id).
+# 3. Deploy, so it is reachable at https://yourdomain/ads.txt
+#
+# google.com, pub-0000000000000000, DIRECT, f08c47fec0942fa0

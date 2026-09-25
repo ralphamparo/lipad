@@ -1,0 +1,9 @@
+# Secrets — never commit
+.env
+
+# Your own ad data and uploaded creatives (they live on the server, not in git)
+data/
+uploads/
+
+node_modules/
+*.log

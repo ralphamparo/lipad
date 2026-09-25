@@ -1,0 +1,10 @@
+# app-ads.txt — proves the Lipad Android app's ads belong to you. Without it, many advertisers
+# refuse to bid and AdMob earnings stay low.
+#
+# 1. In AdMob: Apps → your app → App settings, copy the line it shows under "app-ads.txt".
+# 2. Replace the example below with that exact line (keep your publisher id, not this one).
+# 3. Deploy, so it is reachable at https://yourdomain/app-ads.txt
+# 4. In the Play listing, set the developer website to that same domain — AdMob follows that link
+#    to find this file.
+#
+# google.com, pub-0000000000000000, DIRECT, f08c47fec0942fa0
