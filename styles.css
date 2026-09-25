@@ -173,3 +173,11 @@ input[type=color] { padding: 2px; height: 38px; }
 .promo-cta:hover { filter: brightness(1.1); }
 .promo-close { position: absolute; top: 6px; right: 8px; font: inherit; font-size: 13px; line-height: 1; color: var(--muted); background: none; border: 0; cursor: pointer; padding: 4px; }
 @media (max-width: 520px) { .promo { gap: 10px; padding: 12px 14px; } .promo-body b { font-size: 15px; } .promo-body span { display: none; } }
+
+/* visa-free page */
+.brandlinks { display: flex; align-items: center; gap: 14px; }
+.brandlinks a { color: #fff; font-size: 14px; font-weight: 600; text-decoration: none; opacity: .9; border-bottom: 1px solid rgba(255,255,255,.4); }
+.brandlinks a:hover { opacity: 1; }
+.deal.visa .price.none { color: var(--muted); }
+.deal.visa .route { align-items: baseline; }
+.deal.visa .deal-actions a { width: 100%; }

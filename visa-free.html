@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Visa-Free Countries for Philippine Passport Holders — with Flight Prices | Lipad</title>
+  <meta name="description" content="Every country a Philippine passport can enter visa-free, with a visa on arrival or an online eVisa — sorted by the cheapest flight there right now, in pesos.">
+  <link rel="icon" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#0b3d91">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="hero">
+    <div class="wrap">
+      <div class="brandbar">
+        <a class="brand" href="./">✈ Lipad</a>
+        <a class="install" href="./">All flight deals →</a>
+      </div>
+      <h1>Where can a Philippine passport go?</h1>
+      <p class="lede">Countries you can enter without arranging a visa first — sorted by what the flight costs today.</p>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="controls" aria-label="Filters">
+      <label class="field">
+        <span>Flying from</span>
+        <select id="origin">
+          <option value="ALL">All PH airports</option>
+          <option value="MNL">Manila (MNL)</option>
+          <option value="CEB">Cebu (CEB)</option>
+          <option value="CRK">Clark (CRK)</option>
+          <option value="DVO">Davao (DVO)</option>
+          <option value="ILO">Iloilo (ILO)</option>
+          <option value="KLO">Kalibo (KLO)</option>
+        </select>
+      </label>
+      <div class="field grow">
+        <span>Entry type</span>
+        <div class="chips" id="kinds"></div>
+      </div>
+      <label class="check"><input type="checkbox" id="withFares" checked> Only show places with a fare</label>
+    </section>
+
+    <p class="meta" id="meta">Loading fares…</p>
+    <ol class="grid" id="grid"></ol>
+
+    <p class="when-hint" id="stamp"></p>
+    <div class="notice" id="warn">
+      <strong>Check before you book.</strong> Entry rules change without notice, and airlines can refuse boarding.
+      Confirm with the embassy of the country you're visiting, the
+      <a href="https://dfa.gov.ph" target="_blank" rel="noopener">DFA</a>, or the
+      <a href="https://www.iatatravelcentre.com" target="_blank" rel="noopener">IATA Travel Centre</a>.
+      Philippine immigration may also ask for a return ticket and proof of funds when you leave.
+    </div>
+  </main>
+
+  <footer class="wrap foot">
+    <p>Fares are the lowest recently found by travellers and change before you book. Some links are affiliate links.</p>
+    <p><a href="./">Flight deals</a> · <a href="privacy.html">Privacy policy</a></p>
+  </footer>
+
+  <script src="config.js"></script>
+  <script src="visa-data.js"></script>
+  <script src="visa-free.js"></script>
+</body>
+</html>
