@@ -184,6 +184,7 @@ function render() {
   const names = [...new Set(shown.map((d) => d.destinationName))].join(" & ");
   renderHotels(allFares ? shown[0] : null);
   state.focusDest = allFares && shown[0] ? shown[0].destination : "";
+  promoDeal = (allFares && shown[0]) || shown[0] || null;
   refreshAdsFor(state.region === "All" ? "" : state.region, state.focusDest);
   $("meta").textContent = shown.length
     ? (allFares
@@ -202,9 +203,7 @@ function render() {
 // ---------- hotels (second affiliate stream) ----------
 // Someone looking at fares to one city is also about to need a room there, so offer a hotel search
 // for that city. Travelpayouts pays on hotel bookings too, using the same partner marker.
-function renderHotels(deal) {
-  const box = $("hotels");
-  if (!deal || !CONFIG.hotelMarker) { box.hidden = true; return; }
+function hotelUrl(deal) {
   const url = new URL("https://search.hotellook.com/");
   url.searchParams.set("destination", `${deal.destinationName}, ${deal.countryName}`);
   url.searchParams.set("marker", CONFIG.hotelMarker);
@@ -212,9 +211,62 @@ function renderHotels(deal) {
   url.searchParams.set("adults", adults());
   const r = range();
   if (r) { url.searchParams.set("checkIn", r.from); url.searchParams.set("checkOut", addDays(r.from, 3)); }
-  box.innerHTML = `<a href="${url}" target="_blank" rel="noopener sponsored">🏨 Find hotels in ${deal.destinationName} →</a>`;
+  return url.toString();
+}
+
+function renderHotels(deal) {
+  const box = $("hotels");
+  if (!deal || !CONFIG.hotelMarker) { box.hidden = true; return; }
+  box.innerHTML = `<a href="${hotelUrl(deal)}" target="_blank" rel="noopener sponsored">🏨 Find hotels in ${deal.destinationName} →</a>`;
   box.hidden = false;
 }
+
+// ---------- hotel panel ----------
+// A quiet nudge, not a pop-up: never on load, only once someone has scrolled deep into the
+// results (or is leaving on desktop), for the destination they're actually looking at.
+// Dismissing it hides it for the rest of the visit.
+const PROMO_AFTER_CARDS = 20;
+let promoDeal = null, promoShown = false;
+
+function promoDismissed() {
+  try { return sessionStorage.getItem("lipadPromo") === "off"; } catch { return false; }
+}
+
+function showPromo() {
+  if (promoShown || promoDismissed() || !promoDeal || !CONFIG.hotelMarker) return;
+  const d = promoDeal;
+  promoShown = true;
+  $("promo").innerHTML = `
+    <button type="button" class="promo-close" id="promoClose" aria-label="Close">✕</button>
+    <div class="promo-body">
+      <b>Going to ${d.destinationName}?</b>
+      <span>You'll need somewhere to stay. Compare hotels for your dates.</span>
+    </div>
+    <a class="promo-cta" href="${hotelUrl(d)}" target="_blank" rel="noopener sponsored">See hotels →</a>`;
+  $("promo").hidden = false;
+}
+
+function hidePromo(forGood) {
+  $("promo").hidden = true;
+  promoShown = true;
+  if (forGood) { try { sessionStorage.setItem("lipadPromo", "off"); } catch { /* private mode */ } }
+}
+
+$("promo").addEventListener("click", (e) => { if (e.target.closest("#promoClose")) hidePromo(true); });
+// Opening the hotel search is a success, not a dismissal — just get out of the way.
+$("promo").addEventListener("click", (e) => { if (e.target.closest(".promo-cta")) hidePromo(true); });
+
+addEventListener("scroll", () => {
+  const cards = document.querySelectorAll(".deal");
+  if (cards.length <= PROMO_AFTER_CARDS) return;
+  const trigger = cards[PROMO_AFTER_CARDS];
+  if (trigger && trigger.getBoundingClientRect().top < innerHeight) showPromo();
+}, { passive: true });
+
+// Desktop only: someone heading for the tab bar is about to leave.
+addEventListener("mouseout", (e) => {
+  if (!e.relatedTarget && e.clientY <= 0 && document.querySelectorAll(".deal").length > 3) showPromo();
+});
 
 // ---------- all fares to a destination ----------
 state.route = { key: "", deals: null };
