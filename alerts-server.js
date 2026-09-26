@@ -12,7 +12,9 @@ const MAX_PER_EMAIL = 8;
 const RESEND_KEY = process.env.RESEND_API_KEY || "";
 const FROM = process.env.ALERT_FROM || "Lipad <onboarding@resend.dev>";
 const SITE = (process.env.SITE_URL || "").replace(/\/$/, "");
-const CHECK_MS = 6 * 60 * 60 * 1000;
+// Fares refresh every 30 minutes, so checking a couple of times in between is plenty. Each alert
+// is still capped by QUIET_MS, so a shorter cycle doesn't mean more email for anyone.
+const CHECK_MS = 2 * 60 * 60 * 1000;
 const QUIET_MS = 3 * 24 * 60 * 60 * 1000; // don't email the same alert more than every 3 days
 
 const enabled = () => Boolean(RESEND_KEY && SITE);
@@ -174,8 +176,10 @@ async function sendConfirmation(alert, link) {
 function confirm(id) {
   const a = alerts.find((x) => x.id === id);
   if (!a) return null;
+  const wasNew = !a.confirmed;
   a.confirmed = true;
   save();
+  if (wasNew) checkSoon();
   return a;
 }
 
@@ -270,7 +274,17 @@ async function check(providers) {
   return { checked: due.length, sent };
 }
 
+let liveProviders = null;
+
+// Someone who just confirmed shouldn't wait hours for the first email — if a fare already
+// matches, send it now. Runs in the background; the confirmation page doesn't wait for it.
+function checkSoon() {
+  if (!liveProviders) return;
+  setTimeout(() => check(liveProviders).catch((e) => console.error("instant check failed:", e.message)), 500);
+}
+
 function start(providers) {
+  liveProviders = providers;
   if (!enabled()) {
     console.log("Fare alerts off (set RESEND_API_KEY and SITE_URL to switch them on).");
     return;
@@ -284,4 +298,4 @@ function start(providers) {
 
 const stats = () => ({ total: alerts.length, confirmed: alerts.filter((a) => a.confirmed).length });
 
-module.exports = { enabled, subscribe, resend, confirm, unsubscribe, check, start, stats, describe };
+module.exports = { enabled, subscribe, resend, confirm, unsubscribe, check, checkSoon, start, stats, describe };
