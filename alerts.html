@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Fare Alerts — Get an Email When Flights Get Cheap | Lipad</title>
-  <meta name="description" content="Pick any destination and a price you'd be happy to pay. Lipad emails you when a fare from the Philippines drops below it.">
+  <title>Fare Alerts — Get an Email When Your Trip Gets Cheap | Lipad</title>
+  <meta name="description" content="Describe the trip you want — any city, country or region, your dates, your price — and Lipad emails you when a matching fare appears.">
   <link rel="icon" href="icons/icon-192.png">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
   <link rel="manifest" href="manifest.webmanifest">
@@ -21,19 +21,18 @@
         <a href="visa-free.html" class="tab">🛂 Visa-free</a>
         <a href="alerts.html" class="tab on" aria-current="page">🔔 Fare alerts</a>
       </nav>
-      <h1>Tell us your price. We'll watch for it.</h1>
-      <p class="lede">Pick anywhere in the world and the fare you'd be happy to pay. We check prices through the day and email you when one drops below it.</p>
+      <h1>Describe your trip. We'll watch the price.</h1>
+      <p class="lede">Anywhere in the world, a whole country, or one city — with your dates and your budget. We email you when a matching fare turns up.</p>
     </div>
   </header>
 
   <main class="wrap">
     <div class="notice" id="off" hidden>
-      Fare alerts aren't switched on for this site yet. The owner needs to set <code>RESEND_API_KEY</code> and <code>SITE_URL</code> on the server.
+      Fare alerts aren't switched on yet. The server needs <code>RESEND_API_KEY</code> and <code>SITE_URL</code>.
     </div>
 
     <form class="alert-box big" id="form" hidden>
-      <h2>Create an alert</h2>
-
+      <h2>1. Where do you want to go?</h2>
       <label class="field">
         <span>Flying from</span>
         <select id="origin">
@@ -48,13 +47,35 @@
           <option value="TAG">Bohol–Panglao (TAG)</option>
         </select>
       </label>
-
       <label class="field grow">
-        <span>Going to</span>
-        <input type="text" id="dest" list="destList" placeholder="Anywhere — or type a city, e.g. Tokyo" autocomplete="off">
+        <span>Going to <em>city, country, region — or leave blank for anywhere</em></span>
+        <input type="text" id="dest" list="destList" placeholder="Japan · Tokyo · Southeast Asia · anywhere" autocomplete="off">
         <datalist id="destList"></datalist>
       </label>
 
+      <h2>2. When?</h2>
+      <div class="field">
+        <span>Dates</span>
+        <div class="seg" role="radiogroup" id="whenMode">
+          <button type="button" role="radio" data-v="any" aria-checked="true">Any time</button>
+          <button type="button" role="radio" data-v="month" aria-checked="false">A month</button>
+          <button type="button" role="radio" data-v="range" aria-checked="false">Exact dates</button>
+        </div>
+      </div>
+      <label class="field" id="monthField" hidden>
+        <span>Month</span>
+        <select id="month"></select>
+      </label>
+      <label class="field" id="fromField" hidden>
+        <span>Depart from</span>
+        <input type="date" id="from">
+      </label>
+      <label class="field" id="toField" hidden>
+        <span>Depart until</span>
+        <input type="date" id="to">
+      </label>
+
+      <h2>3. What kind of trip?</h2>
       <div class="field">
         <span>Trip</span>
         <div class="seg" role="radiogroup" id="trip">
@@ -62,12 +83,23 @@
           <button type="button" role="radio" data-v="round" aria-checked="false">Round trip</button>
         </div>
       </div>
-
-      <label class="field narrow">
-        <span>Email me under</span>
-        <input type="number" id="price" min="500" step="100" required placeholder="5000">
+      <label class="field" id="stayField" hidden>
+        <span>Trip length</span>
+        <select id="stay">
+          <option value="">Any length</option>
+          <option value="2-3">Weekend (2–3 nights)</option>
+          <option value="4-5">Short trip (4–5 nights)</option>
+          <option value="6-8">About a week (6–8 nights)</option>
+          <option value="13-15">About 2 weeks (13–15 nights)</option>
+        </select>
       </label>
+      <label class="field narrow">
+        <span>Email me under <em>optional</em></span>
+        <input type="number" id="price" min="500" step="100" placeholder="any price">
+      </label>
+      <label class="check"><input type="checkbox" id="direct"> Direct flights only</label>
 
+      <h2>4. Where should we send it?</h2>
       <label class="field grow">
         <span>Your email</span>
         <input type="email" id="email" required placeholder="you@example.com">
@@ -77,17 +109,17 @@
         <button class="primary" type="submit">Create alert</button>
         <span class="alert-msg" id="msg"></span>
       </div>
-      <p class="hint" id="hint"></p>
+      <p class="hint" id="summary"></p>
     </form>
 
     <section class="prose">
       <h2>How it works</h2>
       <ul>
-        <li><strong>We check through the day.</strong> When a fare matching your alert drops below your price, you get one email with the dates and a link straight to it.</li>
-        <li><strong>No spam.</strong> You confirm the alert by email first, and we send at most one message every few days per alert — and only when the price beats the last one we told you about.</li>
-        <li><strong>One click to stop.</strong> Every email has an unsubscribe link that works immediately.</li>
-        <li><strong>Be realistic with the price.</strong> Set it near the cheapest fare you've seen on that route, not far below it, or the alert may never fire. The
-          <a href="./">deals page</a> shows what each route currently costs.</li>
+        <li><strong>You confirm first.</strong> We email you a link — click it and the alert starts. Nothing is sent until you do.</li>
+        <li><strong>Then we watch.</strong> Prices are checked through the day. When a fare matches your trip, you get one email with the dates, the airline and a link straight to it.</li>
+        <li><strong>Leave the price blank</strong> and we'll tell you whenever it drops below the last price we showed you — good for "I'll go if it's cheap enough".</li>
+        <li><strong>No pestering.</strong> At most one email every few days per alert, and only when there's something genuinely better.</li>
+        <li><strong>One click to stop.</strong> Every email has an unsubscribe link.</li>
       </ul>
     </section>
   </main>

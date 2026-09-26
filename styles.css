@@ -211,3 +211,5 @@ input[type=color] { padding: 2px; height: 38px; }
 .alert-box input[type=text] { font: inherit; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; min-width: 240px; }
 .prose ul { padding-left: 20px; }
 .prose li { margin-bottom: 8px; }
+.alert-box h2 { font-size: 15px; margin: 10px 0 0; flex-basis: 100%; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+.alert-box .field em { font-style: normal; text-transform: none; letter-spacing: 0; font-weight: 400; }

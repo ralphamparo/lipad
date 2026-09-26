@@ -424,13 +424,23 @@ async function getSales(params) {
 // Every destination we currently hold fares for — the list behind the alert form's picker.
 async function getDestinations(params) {
   const { rows } = await getSweep(params);
-  const seen = new Map();
+  const cities = new Map(), countries = new Map(), regions = new Map();
+  const cheapest = (map, key, value, price) => {
+    const found = map.get(key);
+    if (!found) map.set(key, { ...value, from: price });
+    else if (price < found.from) found.from = price;
+  };
   for (const d of rows) {
-    const found = seen.get(d.destination);
-    if (!found) seen.set(d.destination, { code: d.destination, name: d.destinationName, country: d.countryName, from: d.price });
-    else if (d.price < found.from) found.from = d.price;
+    cheapest(cities, d.destination, { code: d.destination, name: d.destinationName, country: d.countryName }, d.price);
+    if (d.countryName) cheapest(countries, d.countryName, { code: d.country, name: d.countryName }, d.price);
+    if (d.region) cheapest(regions, d.region, { name: d.region }, d.price);
   }
-  return { destinations: [...seen.values()].sort((a, b) => a.name.localeCompare(b.name)) };
+  const byName = (a, b) => a.name.localeCompare(b.name);
+  return {
+    destinations: [...cities.values()].sort(byName),
+    countries: [...countries.values()].sort(byName),
+    regions: [...regions.values()].sort(byName),
+  };
 }
 
 // Cheapest known fare per departure month ("YYYY-MM") or week (Monday "YYYY-MM-DD").
@@ -598,12 +608,14 @@ http.createServer((req, res) => {
   if (url.pathname === "/api/alerts/status") return sendJson(res, Promise.resolve({ enabled: fareAlerts.enabled() }));
   if (url.pathname === "/api/alerts") return void handleAlertSignup(req, res);
   if (url.pathname === "/alerts/confirm" || url.pathname === "/alerts/unsubscribe") {
-    const done = url.pathname.endsWith("confirm")
-      ? fareAlerts.confirm(url.searchParams.get("t"))
-      : fareAlerts.unsubscribe(url.searchParams.get("t"));
     const confirmed = url.pathname.endsWith("confirm");
-    res.writeHead(done ? 200 : 404, { "Content-Type": TYPES[".html"] });
-    res.end(alertPage(done, confirmed));
+    const job = confirmed
+      ? fareAlerts.confirm(url.searchParams.get("t"))
+      : Promise.resolve(fareAlerts.unsubscribe(url.searchParams.get("t")));
+    job.then((done) => {
+      res.writeHead(done ? 200 : 404, { "Content-Type": TYPES[".html"] });
+      res.end(alertPage(done, confirmed));
+    }).catch((e) => { console.error(e); res.writeHead(500).end("Something went wrong."); });
     return;
   }
 
