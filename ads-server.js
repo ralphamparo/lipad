@@ -4,7 +4,8 @@ const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
 
-const DATA_DIR = path.join(__dirname, "data");
+// Tests point LIPAD_DATA_DIR somewhere temporary so they can never touch real subscribers.
+const DATA_DIR = process.env.LIPAD_DATA_DIR || path.join(__dirname, "data");
 const UPLOADS_DIR = path.join(__dirname, "uploads");
 const FILE = path.join(DATA_DIR, "ads.json");
 const PLACEMENTS = ["top", "mid", "bottom"];

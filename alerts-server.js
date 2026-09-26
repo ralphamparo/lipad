@@ -5,7 +5,8 @@ const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
 
-const DATA_DIR = path.join(__dirname, "data");
+// Tests point LIPAD_DATA_DIR somewhere temporary so they can never touch real subscribers.
+const DATA_DIR = process.env.LIPAD_DATA_DIR || path.join(__dirname, "data");
 const FILE = path.join(DATA_DIR, "alerts.json");
 const MAX_PER_EMAIL = 8;
 const RESEND_KEY = process.env.RESEND_API_KEY || "";
@@ -48,9 +49,13 @@ const day = (stamp) => stamp.slice(0, 10);
 const pretty = (iso) => new Date(iso + "T00:00:00Z").toLocaleDateString("en-PH", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
 
 // ---------- describing an alert in plain words ----------
+// A handful of country names read wrong without "the".
+const THE = /^(Philippines|United States|United Kingdom|United Arab Emirates|Netherlands|Maldives|Bahamas|Czech Republic|Dominican Republic|Marshall Islands|Solomon Islands|Cook Islands|Seychelles)$/;
+const theName = (n) => (THE.test(n) ? "the " + n : n);
+
 function whereLabel(a) {
   if (a.scope === "city") return a.scopeLabel || a.scopeValue;
-  if (a.scope === "country") return a.scopeLabel || a.scopeValue;
+  if (a.scope === "country") return theName(a.scopeLabel || a.scopeValue);
   if (a.scope === "region") return a.scopeValue;
   return "anywhere";
 }
@@ -62,7 +67,8 @@ function describe(a) {
   else bits.push("any dates in the next 12 months");
   if (a.minNights) bits.push(`${a.minNights}–${a.maxNights} night stays`);
   if (a.direct) bits.push("direct flights only");
-  bits.push(a.maxPrice ? `under ${peso(a.maxPrice)}` : "whenever the price drops");
+  if (a.kind === "sale") bits.push(`whenever a fare is at least ${a.minDiscount}% below its usual price`);
+  else bits.push(a.maxPrice ? `under ${peso(a.maxPrice)}` : "whenever the price drops");
   return bits.join(", ");
 }
 
@@ -94,6 +100,8 @@ async function subscribe(input) {
   if (scope !== "any" && !scopeValue) throw new Error("Pick a destination, or choose anywhere.");
   if (scope === "city" && !/^[A-Z]{3}$/.test(scopeValue)) throw new Error("That city isn't one we have fares for.");
 
+  const kind = input.kind === "sale" ? "sale" : "price";
+  const minDiscount = Math.min(80, Math.max(15, Math.round(Number(input.minDiscount) || 30)));
   const price = input.maxPrice === "" || input.maxPrice == null ? 0 : Math.round(Number(input.maxPrice));
   if (price && (price < 500 || price > 500000)) throw new Error("Pick a target price between ₱500 and ₱500,000.");
 
@@ -113,6 +121,8 @@ async function subscribe(input) {
     scopeLabel: String(input.scopeLabel || scopeValue).slice(0, 80),
     from,
     to,
+    kind,
+    minDiscount,
     direct: input.direct === true,
     minNights: nights ? Math.min(+nights[1], +nights[2]) : 0,
     maxNights: nights ? Math.max(+nights[1], +nights[2]) : 0,
@@ -194,7 +204,8 @@ const matchesScope = (d, a) =>
   (a.scope === "region" && d.region === a.scopeValue);
 
 // getDeals is injected so this file doesn't reach into the fare cache itself.
-async function check(getDeals) {
+async function check(providers) {
+  const { getDeals, getSales } = typeof providers === "function" ? { getDeals: providers, getSales: providers } : providers;
   if (!enabled()) return { checked: 0, sent: 0 };
   const now = Date.now();
   let sent = 0;
@@ -202,7 +213,8 @@ async function check(getDeals) {
 
   for (const a of due) {
     try {
-      const { deals } = await getDeals({
+      const source = a.kind === "sale" ? getSales : getDeals;
+      const { deals } = await source({
         origin: a.origin,
         oneWay: a.trip === "oneway",
         direct: a.direct,
@@ -210,12 +222,15 @@ async function check(getDeals) {
         minNights: a.minNights, maxNights: a.maxNights,
         dest: a.scope === "city" ? [a.scopeValue] : [],
       });
-      const matching = (deals || []).filter((d) => matchesScope(d, a)).sort((x, y) => x.price - y.price);
+      const matching = (deals || [])
+        .filter((d) => matchesScope(d, a) && (a.kind !== "sale" || d.discount >= a.minDiscount))
+        .sort((x, y) => (a.kind === "sale" ? y.discount - x.discount : x.price - y.price));
       const hit = matching[0];
       if (!hit) continue;
       // With a target price: anything under it. Without one: only a genuine drop on what we last sent.
-      const worth = a.maxPrice ? hit.price <= a.maxPrice : true;
-      if (!worth || (a.lastPrice && hit.price >= a.lastPrice)) continue;
+      const worth = a.kind === "sale" ? true : (a.maxPrice ? hit.price <= a.maxPrice : true);
+      const staleRepeat = a.kind === "sale" ? a.lastPrice === hit.price : (a.lastPrice && hit.price >= a.lastPrice);
+      if (!worth || staleRepeat) continue;
 
       const link = hit.link.replace("{adults}%20adults", "1%20adult").replace("{adults}", "1");
       const stop = `${SITE}/alerts/unsubscribe?t=${a.id}`;
@@ -223,9 +238,11 @@ async function check(getDeals) {
       const when = `${pretty(day(hit.departAt))}${hit.returnAt ? ` → ${pretty(day(hit.returnAt))}` : ""}`;
       await sendEmail({
         to: a.email,
-        subject: `${peso(hit.price)} to ${hit.destinationName}${a.maxPrice ? ` — under your ${peso(a.maxPrice)}` : " — price dropped"}`,
+        subject: a.kind === "sale"
+          ? `${hit.discount}% off: ${peso(hit.price)} to ${hit.destinationName}`
+          : `${peso(hit.price)} to ${hit.destinationName}${a.maxPrice ? ` — under your ${peso(a.maxPrice)}` : " — price dropped"}`,
         text: `${hit.origin} → ${hit.destination} (${hit.destinationName}, ${hit.countryName}) for ${peso(hit.price)}\n${when} · ${hit.airlineName}\n\nSee it: ${link}\n\nYour alert: ${describe(a)}\nStop these emails: ${stop}`,
-        html: shell(`<p style="font-size:26px;font-weight:800;color:#0f7b4f;margin:0">${peso(hit.price)}</p>
+        html: shell(`<p style="font-size:26px;font-weight:800;color:#0f7b4f;margin:0">${peso(hit.price)}${hit.typical ? ` <span style="font-size:15px;color:#667085;font-weight:500"><s>${peso(hit.typical)}</s> usually · ${hit.discount}% off</span>` : ""}</p>
           <p style="margin:4px 0 14px"><b>${hit.destinationName}</b>, ${hit.countryName} · ${hit.origin} → ${hit.destination}<br>
             ${when} · ${hit.airlineName}${hit.stops === 0 ? " · direct" : ` · ${hit.stops} stop${hit.stops > 1 ? "s" : ""}`}</p>
           <p><a href="${link}" style="background:#0b3d91;color:#fff;text-decoration:none;padding:11px 20px;border-radius:999px;display:inline-block;font-weight:600">See this fare</a></p>
@@ -244,12 +261,12 @@ async function check(getDeals) {
   return { checked: due.length, sent };
 }
 
-function start(getDeals) {
+function start(providers) {
   if (!enabled()) {
     console.log("Fare alerts off (set RESEND_API_KEY and SITE_URL to switch them on).");
     return;
   }
-  const run = () => check(getDeals).then(({ checked, sent }) => {
+  const run = () => check(providers).then(({ checked, sent }) => {
     if (checked) console.log(`Fare alerts: checked ${checked}, emailed ${sent}`);
   }).catch((e) => console.error("alert run failed:", e.message));
   setTimeout(run, 60 * 1000).unref(); // let the fare cache warm up first

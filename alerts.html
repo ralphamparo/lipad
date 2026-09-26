@@ -32,6 +32,13 @@
     </div>
 
     <form class="alert-box big" id="form" hidden>
+      <h2>Quick picks</h2>
+      <div class="presets" id="quick">
+        <button type="button" class="chip" data-q="piso">🇵🇭 Piso fare watch</button>
+        <button type="button" class="chip" data-q="sale">🔻 Any big seat sale</button>
+        <button type="button" class="chip" data-q="asia">✈ Asia under ₱5,000</button>
+      </div>
+
       <h2>1. Where do you want to go?</h2>
       <label class="field">
         <span>Flying from</span>
@@ -93,9 +100,25 @@
           <option value="13-15">About 2 weeks (13–15 nights)</option>
         </select>
       </label>
-      <label class="field narrow">
+      <div class="field">
+        <span>Tell me when</span>
+        <div class="seg" role="radiogroup" id="kind">
+          <button type="button" role="radio" data-v="price" aria-checked="true">It is under a price</button>
+          <button type="button" role="radio" data-v="sale" aria-checked="false">It is a seat sale</button>
+        </div>
+      </div>
+      <label class="field narrow" id="priceField">
         <span>Email me under <em>optional</em></span>
         <input type="number" id="price" min="500" step="100" placeholder="any price">
+      </label>
+      <label class="field" id="discountField" hidden>
+        <span>How big a drop</span>
+        <select id="discount">
+          <option value="25">25% below usual</option>
+          <option value="30" selected>30% below usual</option>
+          <option value="40">40% below usual</option>
+          <option value="50">Half price or better</option>
+        </select>
       </label>
       <label class="check"><input type="checkbox" id="direct"> Direct flights only</label>
 

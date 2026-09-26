@@ -8,7 +8,11 @@ const pad = (n) => String(n).padStart(2, "0");
 const monthEnd = (ym) => { const d = new Date(+ym.slice(0, 4), +ym.slice(5, 7), 0); return `${ym}-${pad(d.getDate())}`; };
 const prettyDay = (iso) => new Date(`${iso}T00:00:00`).toLocaleDateString("en-PH", { day: "numeric", month: "short", year: "numeric" });
 
-const state = { trip: "oneway", when: "any", cities: [], countries: [], regions: [] };
+// A handful of country names read wrong without "the".
+const THE = /^(Philippines|United States|United Kingdom|United Arab Emirates|Netherlands|Maldives|Bahamas|Czech Republic|Dominican Republic|Marshall Islands|Solomon Islands|Cook Islands|Seychelles)$/;
+const theName = (n) => (THE.test(n) ? "the " + n : n);
+
+const state = { trip: "oneway", when: "any", kind: "price", cities: [], countries: [], regions: [] };
 
 // Months for the "a month" option.
 (() => {
@@ -40,7 +44,7 @@ function resolveScope(text) {
 
   // Prefer the most specific thing that matches what they typed exactly.
   if (city && city.name.toLowerCase() === q) return { scope: "city", scopeValue: city.code, scopeLabel: city.name, label: `${city.name}, ${city.country}`, from: city.from };
-  if (country) return { scope: "country", scopeValue: country.name, scopeLabel: country.name, label: `anywhere in ${country.name}`, from: country.from };
+  if (country) return { scope: "country", scopeValue: country.name, scopeLabel: country.name, label: `anywhere in ${theName(country.name)}`, from: country.from };
   if (region) return { scope: "region", scopeValue: region.name, scopeLabel: region.name, label: `anywhere in ${region.name}`, from: region.from };
   if (city) return { scope: "city", scopeValue: city.code, scopeLabel: city.name, label: `${city.name}, ${city.country}`, from: city.from };
   return null;
@@ -66,7 +70,9 @@ function updateSummary() {
   bits.push(d.from ? (d.from === d.to ? `departing ${prettyDay(d.from)}` : `departing ${prettyDay(d.from)} – ${prettyDay(d.to)}`) : "any time in the next 12 months");
   if (state.trip === "round" && $("stay").value) bits.push(`${$("stay").value.replace("-", "–")} night stays`);
   if ($("direct").checked) bits.push("direct only");
-  bits.push($("price").value ? `under ${peso($("price").value)}` : "whenever the price drops");
+  bits.push(state.kind === "sale"
+    ? `whenever a fare is at least ${$("discount").value}% below its usual price`
+    : $("price").value ? `under ${peso($("price").value)}` : "whenever the price drops");
   $("summary").textContent = `We'll watch: ${bits.join(", ")}.`;
   if (chosen.from && !$("price").dataset.touched) $("price").placeholder = `any price — cheapest lately ${peso(chosen.from)}`;
 }
@@ -115,6 +121,35 @@ $("trip").addEventListener("click", (e) => {
   if (id === "from" && $("to").value && $("to").value < $("from").value) $("to").value = $("from").value;
   updateSummary();
 }));
+$("kind").addEventListener("click", (e) => {
+  const b = e.target.closest("button");
+  if (!b) return;
+  setSeg("kind", b.dataset.v, "kind");
+  $("priceField").hidden = b.dataset.v === "sale";
+  $("discountField").hidden = b.dataset.v !== "sale";
+  updateSummary();
+});
+
+// One tap to set up the alerts people actually ask for. A true ₱1 base fare lands around
+// ₱500–1,500 once taxes are in, so the piso watch uses a realistic all-in ceiling.
+const QUICK = {
+  piso: { dest: "Philippines", kind: "price", price: "1499", trip: "oneway" },
+  sale: { dest: "", kind: "sale", discount: "40" },
+  asia: { dest: "Southeast Asia", kind: "price", price: "5000" },
+};
+$("quick").addEventListener("click", (e) => {
+  const b = e.target.closest(".chip");
+  if (!b) return;
+  const q = QUICK[b.dataset.q];
+  for (const chip of $("quick").querySelectorAll(".chip")) chip.setAttribute("aria-pressed", chip === b);
+  $("dest").value = q.dest;
+  $("price").value = q.price || "";
+  if (q.discount) $("discount").value = q.discount;
+  $("kind").querySelector(`[data-v="${q.kind}"]`).click();
+  if (q.trip) $("trip").querySelector(`[data-v="${q.trip}"]`).click();
+  updateSummary();
+});
+
 $("dest").addEventListener("input", updateSummary);
 $("price").addEventListener("input", () => { $("price").dataset.touched = "1"; updateSummary(); });
 
@@ -143,7 +178,9 @@ $("form").addEventListener("submit", async (e) => {
         to: d.to,
         nights: state.trip === "round" ? $("stay").value : "",
         direct: $("direct").checked,
-        maxPrice: $("price").value,
+        kind: state.kind,
+        minDiscount: $("discount").value,
+        maxPrice: state.kind === "sale" ? "" : $("price").value,
       }),
     });
     const data = await res.json();

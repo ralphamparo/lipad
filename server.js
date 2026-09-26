@@ -507,7 +507,7 @@ function prewarm() {
 }
 prewarm();
 setInterval(prewarm, CACHE_MS - 60 * 1000).unref();
-fareAlerts.start(getDeals);
+fareAlerts.start({ getDeals, getSales });
 
 // ---------- your own ads ----------
 // Constant-time compare so the password can't be guessed by timing the response.
