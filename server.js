@@ -9,6 +9,7 @@ const http = require("http");
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
+const zlib = require("zlib");
 
 const ROOT = __dirname;
 const PORT = process.env.PORT || process.argv[2] || 4325;
@@ -99,12 +100,27 @@ function nextMonths(n) {
 // Cache with in-flight de-duplication: concurrent callers share one upstream job.
 const cache = new Map();
 const inflight = new Map();
+// A sweep holds thousands of fares, and every origin/trip/direct/day combination makes its own
+// entry. Left alone the map only grows, so expired entries go and the oldest are dropped once
+// there are too many — on a small host that's the difference between steady and out of memory.
+const MAX_CACHE_ENTRIES = 120;
+function trimCache() {
+  const now = Date.now();
+  for (const [key, entry] of cache) if (now >= entry.expires) cache.delete(key);
+  while (cache.size > MAX_CACHE_ENTRIES) cache.delete(cache.keys().next().value);
+}
+setInterval(trimCache, 5 * 60 * 1000).unref();
+
 function cached(key, fn, { force = false } = {}) {
   const hit = cache.get(key);
-  if (!force && hit && Date.now() < hit.expires) return Promise.resolve(hit.value);
+  if (!force && hit && Date.now() < hit.expires) {
+    cache.delete(key); // re-insert so the most recently used entries survive trimming
+    cache.set(key, hit);
+    return Promise.resolve(hit.value);
+  }
   if (inflight.has(key)) return inflight.get(key);
   const job = fn()
-    .then(({ value, ttl }) => { cache.set(key, { value, expires: Date.now() + ttl }); return value; })
+    .then(({ value, ttl }) => { cache.set(key, { value, expires: Date.now() + ttl }); trimCache(); return value; })
     .finally(() => inflight.delete(key));
   inflight.set(key, job);
   return job;
@@ -507,10 +523,35 @@ function parseParams(url) {
   return params;
 }
 
-function sendJson(res, promise) {
+// The full deals payload is ~290 KB of JSON and compresses to about 21 KB, which matters a lot
+// on mobile data. Everything text goes out gzipped when the browser says it can take it.
+const SECURITY_HEADERS = {
+  "X-Content-Type-Options": "nosniff",
+  "X-Frame-Options": "SAMEORIGIN",
+  "Referrer-Policy": "strict-origin-when-cross-origin",
+};
+
+function send(req, res, status, headers, body) {
+  const buf = Buffer.isBuffer(body) ? body : Buffer.from(body);
+  const type = headers["Content-Type"] || "";
+  const compressible = /json|text|javascript|manifest|svg/.test(type);
+  const wants = /\bgzip\b/.test(req.headers["accept-encoding"] || "");
+  if (compressible && wants && buf.length > 1024) {
+    zlib.gzip(buf, (err, gz) => {
+      if (err) { res.writeHead(status, { ...SECURITY_HEADERS, ...headers }); return res.end(buf); }
+      res.writeHead(status, { ...SECURITY_HEADERS, ...headers, "Content-Encoding": "gzip", "Content-Length": gz.length, Vary: "Accept-Encoding" });
+      res.end(gz);
+    });
+    return;
+  }
+  res.writeHead(status, { ...SECURITY_HEADERS, ...headers, "Content-Length": buf.length });
+  res.end(buf);
+}
+
+function sendJson(req, res, promise) {
   promise
-    .then((body) => { res.writeHead(200, { "Content-Type": TYPES[".json"], "Cache-Control": "no-store" }); res.end(JSON.stringify(body)); })
-    .catch((e) => { console.error(e); res.writeHead(500, { "Content-Type": TYPES[".json"] }).end("{}"); });
+    .then((body) => send(req, res, 200, { "Content-Type": TYPES[".json"], "Cache-Control": "no-store" }, JSON.stringify(body)))
+    .catch((e) => { console.error(e); send(req, res, 500, { "Content-Type": TYPES[".json"] }, "{}"); });
 }
 
 // Keep the default "all airports" sweeps warm so first visitors don't wait.
@@ -522,6 +563,39 @@ function prewarm() {
 prewarm();
 setInterval(prewarm, CACHE_MS - 60 * 1000).unref();
 fareAlerts.start({ getDeals, getSales, getPiso: (p) => getSales(p, "piso") });
+
+// ---------- rate limiting ----------
+// A plain counter per caller. Signups send email on your account's quota, and the admin password
+// is worth guessing, so neither should be callable as fast as a script can type.
+const hits = new Map();
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, h] of hits) if (now > h.until) hits.delete(key);
+}, 10 * 60 * 1000).unref();
+
+const callerOf = (req) =>
+  (req.headers["x-forwarded-for"] || "").split(",")[0].trim() || req.socket.remoteAddress || "unknown";
+
+function tooMany(req, bucket, limit, windowMs, { count = true } = {}) {
+  const key = bucket + ":" + callerOf(req);
+  const now = Date.now();
+  const h = hits.get(key);
+  if (!h || now > h.until) {
+    if (count) hits.set(key, { count: 1, until: now + windowMs });
+    return false;
+  }
+  if (count) h.count++;
+  return h.count > limit;
+}
+
+// Only wrong passwords count, so getting it right after a few typos still lets you in.
+function noteFailure(req, bucket, windowMs) {
+  const key = bucket + ":" + callerOf(req);
+  const now = Date.now();
+  const h = hits.get(key);
+  if (!h || now > h.until) hits.set(key, { count: 1, until: now + windowMs });
+  else h.count++;
+}
 
 // ---------- your own ads ----------
 // Constant-time compare so the password can't be guessed by timing the response.
@@ -550,22 +624,29 @@ function readJsonBody(req, limit = 2 * 1024 * 1024) {
 }
 
 async function handleAdmin(req, res, url) {
+  const LOCKOUT_MS = 15 * 60 * 1000;
+  if (tooMany(req, "admin", 10, LOCKOUT_MS, { count: false })) {
+    res.writeHead(429, { "Content-Type": TYPES[".json"] });
+    res.end(JSON.stringify({ error: "Too many wrong passwords. Wait 15 minutes." }));
+    return;
+  }
   if (!adminOk(req)) {
+    noteFailure(req, "admin", LOCKOUT_MS);
     res.writeHead(401, { "Content-Type": TYPES[".json"] });
     res.end(JSON.stringify({ error: ADMIN_TOKEN ? "Wrong password." : "Admin is disabled: set ADMIN_TOKEN on the server." }));
     return;
   }
   try {
     if (req.method === "GET" && url.pathname === "/api/admin/ads") {
-      return sendJson(res, Promise.resolve({ ads: ownAds.list(), placements: ownAds.PLACEMENTS }));
+      return sendJson(req, res, Promise.resolve({ ads: ownAds.list(), placements: ownAds.PLACEMENTS }));
     }
     if (req.method === "POST" && url.pathname === "/api/admin/ads") {
       const ad = ownAds.upsert(await readJsonBody(req));
-      return sendJson(res, Promise.resolve({ ad }));
+      return sendJson(req, res, Promise.resolve({ ad }));
     }
     if (req.method === "DELETE" && url.pathname.startsWith("/api/admin/ads/")) {
       const ok = ownAds.remove(url.pathname.split("/").pop());
-      return sendJson(res, Promise.resolve({ ok }));
+      return sendJson(req, res, Promise.resolve({ ok }));
     }
     res.writeHead(404, { "Content-Type": TYPES[".json"] }).end('{"error":"Not found"}');
   } catch (e) {
@@ -578,6 +659,7 @@ async function handleAdmin(req, res, url) {
 async function handleAlertResend(req, res) {
   const reply = (code, body) => { res.writeHead(code, { "Content-Type": TYPES[".json"] }); res.end(JSON.stringify(body)); };
   if (req.method !== "POST") return reply(405, { error: "Use POST." });
+  if (tooMany(req, "resend", 5, 60 * 60 * 1000)) return reply(429, { error: "Try again in a little while." });
   try {
     await fareAlerts.resend((await readJsonBody(req, 2048)).email);
     // Always the same answer, so this can't be used to discover who has signed up.
@@ -593,6 +675,9 @@ async function handleAlertSignup(req, res) {
     res.end(JSON.stringify(body));
   };
   if (req.method !== "POST") return reply(405, { error: "Use POST." });
+  if (tooMany(req, "signup", 5, 60 * 60 * 1000)) {
+    return reply(429, { error: "That is a lot of alerts at once. Try again in an hour." });
+  }
   try {
     await fareAlerts.subscribe(await readJsonBody(req, 8 * 1024));
     reply(200, { ok: true, message: "Check your inbox and click the confirmation link." });
@@ -613,20 +698,20 @@ const alertPage = (alert, confirmed) => `<!doctype html><meta charset="utf-8">
     ? "We're watching for this trip and will email you as soon as a matching fare appears."
     : "You won't get any more emails about this alert."}</p>
 ${alert && confirmed
-  ? `<p style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px"><b>${fareAlerts.describe(alert)}</b></p>
+  ? `<p style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px"><b>${fareAlerts.describe(alert, true)}</b></p>
 <p>Prices move fast, so act quickly when one lands.</p>`
   : ""}
 <p><a href="/alerts.html">Set up another alert</a> · <a href="/">See what's cheap right now</a></p></main>`;
 
 http.createServer((req, res) => {
   const url = new URL(req.url, "http://localhost");
-  if (url.pathname === "/api/deals") return sendJson(res, getDeals(parseParams(url)));
-  if (url.pathname === "/api/lows") return sendJson(res, getLows(parseParams(url), url.searchParams.get("unit") === "week" ? "week" : "month"));
-  if (url.pathname === "/api/sales") return sendJson(res, getSales(parseParams(url), url.searchParams.get("mode") === "piso" ? "piso" : "sale"));
-  if (url.pathname === "/api/destinations") return sendJson(res, getDestinations(parseParams(url)));
+  if (url.pathname === "/api/deals") return sendJson(req, res, getDeals(parseParams(url)));
+  if (url.pathname === "/api/lows") return sendJson(req, res, getLows(parseParams(url), url.searchParams.get("unit") === "week" ? "week" : "month"));
+  if (url.pathname === "/api/sales") return sendJson(req, res, getSales(parseParams(url), url.searchParams.get("mode") === "piso" ? "piso" : "sale"));
+  if (url.pathname === "/api/destinations") return sendJson(req, res, getDestinations(parseParams(url)));
   if (url.pathname === "/api/ads") {
     const placements = (url.searchParams.get("placements") || "").split(",").filter((p) => ownAds.PLACEMENTS.includes(p));
-    return sendJson(res, Promise.resolve(ownAds.serve({
+    return sendJson(req, res, Promise.resolve(ownAds.serve({
       placements, region: url.searchParams.get("region") || "", dest: (url.searchParams.get("dest") || "").toUpperCase(),
     })));
   }
@@ -636,7 +721,7 @@ http.createServer((req, res) => {
     return res.end();
   }
   if (url.pathname.startsWith("/api/admin/")) return void handleAdmin(req, res, url);
-  if (url.pathname === "/api/alerts/status") return sendJson(res, Promise.resolve({ enabled: fareAlerts.enabled() }));
+  if (url.pathname === "/api/alerts/status") return sendJson(req, res, Promise.resolve({ enabled: fareAlerts.enabled() }));
   if (url.pathname === "/api/alerts") return void handleAlertSignup(req, res);
   if (url.pathname === "/api/alerts/resend") return void handleAlertResend(req, res);
   if (url.pathname === "/alerts/confirm" || url.pathname === "/alerts/unsubscribe") {
@@ -664,9 +749,11 @@ http.createServer((req, res) => {
     return;
   }
   fs.readFile(file, (err, data) => {
-    if (err) { res.writeHead(404, { "Content-Type": "text/plain" }).end("Not found"); return; }
-    res.writeHead(200, { "Content-Type": TYPES[path.extname(file)] || "application/octet-stream" });
-    res.end(data);
+    if (err) { send(req, res, 404, { "Content-Type": "text/plain" }, "Not found"); return; }
+    const ext = path.extname(file);
+    // Pages must stay fresh; icons and stylesheets can sit in the browser cache for an hour.
+    const cacheFor = ext === ".html" ? "no-cache" : "public, max-age=3600";
+    send(req, res, 200, { "Content-Type": TYPES[ext] || "application/octet-stream", "Cache-Control": cacheFor }, data);
   });
 }).listen(PORT, () => {
   // Hosts like Render publish the real address in an env var; locally it's just localhost.

@@ -45,6 +45,9 @@ const peso = (n) => "₱" + Math.round(n).toLocaleString("en-PH");
 const token = () => crypto.randomBytes(16).toString("hex");
 const validEmail = (e) => /^[^\s@]+@[^\s@]+\.[a-z]{2,}$/i.test(e || "");
 const isDay = (v) => /^\d{4}-\d{2}-\d{2}$/.test(v || "");
+// Place names only — anything that could carry markup is dropped at the door.
+const placeName = (v) => String(v || "").replace(/[^\p{L}\p{N} ,.'()\-–]/gu, "").slice(0, 60).trim();
+const escapeHtml = (v) => String(v == null ? "" : v).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const day = (stamp) => stamp.slice(0, 10);
 const pretty = (iso) => new Date(iso + "T00:00:00Z").toLocaleDateString("en-PH", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
 
@@ -60,9 +63,10 @@ function whereLabel(a) {
   return "anywhere";
 }
 
-function describe(a) {
+function describe(a, forHtml = false) {
+  const clean = (v) => (forHtml ? escapeHtml(v) : v);
   const bits = [];
-  bits.push(`${a.trip === "round" ? "Round trips" : "One-way flights"} from ${a.origin === "ALL" ? "any PH airport" : a.origin} to ${whereLabel(a)}`);
+  bits.push(`${a.trip === "round" ? "Round trips" : "One-way flights"} from ${a.origin === "ALL" ? "any PH airport" : a.origin} to ${clean(whereLabel(a))}`);
   if (a.from && a.to) bits.push(a.from === a.to ? `departing ${pretty(a.from)}` : `departing between ${pretty(a.from)} and ${pretty(a.to)}`);
   else bits.push("any dates in the next 12 months");
   if (a.minNights) bits.push(`${a.minNights}–${a.maxNights} night stays`);
@@ -97,7 +101,7 @@ async function subscribe(input) {
   }
 
   const scope = ["city", "country", "region", "any"].includes(input.scope) ? input.scope : "any";
-  const scopeValue = String(input.scopeValue || "").slice(0, 60).trim();
+  const scopeValue = placeName(input.scopeValue);
   if (scope !== "any" && !scopeValue) throw new Error("Pick a destination, or choose anywhere.");
   if (scope === "city" && !/^[A-Z]{3}$/.test(scopeValue)) throw new Error("That city isn't one we have fares for.");
 
@@ -119,7 +123,7 @@ async function subscribe(input) {
     trip: input.trip === "round" ? "round" : "oneway",
     scope,
     scopeValue,
-    scopeLabel: String(input.scopeLabel || scopeValue).slice(0, 80),
+    scopeLabel: placeName(input.scopeLabel) || scopeValue,
     from,
     to,
     kind,
@@ -157,7 +161,7 @@ async function sendConfirmation(alert, link) {
     // Big, full-width button with the link spelled out underneath: phone clients often shrink
     // styled links, and some strip the styling altogether.
     html: shell(`<p style="font-size:17px;margin:0 0 6px"><b>One tap and we'll start watching this trip:</b></p>
-      <p style="background:#f6f3ee;border-radius:10px;padding:12px 14px;margin:0 0 20px">${describe(alert)}</p>
+      <p style="background:#f6f3ee;border-radius:10px;padding:12px 14px;margin:0 0 20px">${describe(alert, true)}</p>
       <a href="${link}" style="background:#0b3d91;color:#ffffff;text-decoration:none;padding:16px 24px;border-radius:12px;display:block;text-align:center;font-weight:700;font-size:18px;line-height:1.2">Confirm this alert →</a>
       <p style="color:#667085;font-size:13px;margin:14px 0 0">Button not working? Paste this into your browser:<br>
         <span style="word-break:break-all;color:#0b3d91">${link}</span></p>
@@ -252,7 +256,7 @@ async function check(providers) {
             ${when} · ${hit.airlineName}${hit.stops === 0 ? " · direct" : ` · ${hit.stops} stop${hit.stops > 1 ? "s" : ""}`}</p>
           <p><a href="${link}" style="background:#0b3d91;color:#fff;text-decoration:none;padding:11px 20px;border-radius:999px;display:inline-block;font-weight:600">See this fare</a></p>
           ${others.length ? `<p style="color:#667085;font-size:13px">Also matching: ${others.map((o) => `${o.destinationName} ${peso(o.price)}`).join(" · ")}</p>` : ""}
-          <p style="color:#667085;font-size:12px;margin-top:20px">Your alert: ${describe(a)}.<br>
+          <p style="color:#667085;font-size:12px;margin-top:20px">Your alert: ${describe(a, true)}.<br>
             <a href="${stop}">Stop these emails</a>.</p>`),
       });
       a.lastSent = now;
