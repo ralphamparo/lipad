@@ -150,9 +150,31 @@ $("form").addEventListener("submit", async (e) => {
     if (!res.ok) throw new Error(data.error || "That didn't work.");
     msg.className = "alert-msg good";
     msg.textContent = data.message;
+    $("sent").hidden = false;
+    $("sent").scrollIntoView({ behavior: "smooth", block: "nearest" });
   } catch (err) {
     msg.className = "alert-msg bad";
     msg.textContent = err.message;
+  }
+});
+
+// "Send it again" — the server only resends to an address with an unconfirmed alert, at most
+// once every few minutes, and answers the same either way.
+$("resend").addEventListener("click", async () => {
+  const note = $("resendMsg");
+  note.className = "alert-msg";
+  note.textContent = "Sending…";
+  try {
+    const res = await fetch(`${API}/api/alerts/resend`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: $("email").value.trim() }),
+    });
+    const data = await res.json();
+    note.className = "alert-msg good";
+    note.textContent = data.message || "Sent.";
+  } catch {
+    note.className = "alert-msg bad";
+    note.textContent = "Could not reach the server.";
   }
 });
 

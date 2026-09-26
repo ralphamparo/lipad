@@ -213,3 +213,5 @@ input[type=color] { padding: 2px; height: 38px; }
 .prose li { margin-bottom: 8px; }
 .alert-box h2 { font-size: 15px; margin: 10px 0 0; flex-basis: 100%; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
 .alert-box .field em { font-style: normal; text-transform: none; letter-spacing: 0; font-weight: 400; }
+.sent-note { flex-basis: 100%; background: var(--bg); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; font-size: 14px; }
+.linkish { font: inherit; color: var(--brand); background: none; border: 0; padding: 0; text-decoration: underline; cursor: pointer; }

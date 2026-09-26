@@ -561,6 +561,18 @@ async function handleAdmin(req, res, url) {
 }
 
 // ---------- fare alerts ----------
+async function handleAlertResend(req, res) {
+  const reply = (code, body) => { res.writeHead(code, { "Content-Type": TYPES[".json"] }); res.end(JSON.stringify(body)); };
+  if (req.method !== "POST") return reply(405, { error: "Use POST." });
+  try {
+    await fareAlerts.resend((await readJsonBody(req, 2048)).email);
+    // Always the same answer, so this can't be used to discover who has signed up.
+    reply(200, { ok: true, message: "If that address has an unconfirmed alert, the email is on its way." });
+  } catch (e) {
+    reply(400, { error: e.message });
+  }
+}
+
 async function handleAlertSignup(req, res) {
   const reply = (code, body) => {
     res.writeHead(code, { "Content-Type": TYPES[".json"] });
@@ -576,16 +588,21 @@ async function handleAlertSignup(req, res) {
 }
 
 // Small standalone page for the links inside alert emails.
-const alertPage = (found, confirmed) => `<!doctype html><meta charset="utf-8">
+// This page replaces the old "you're all set" email, so it has to state what is being watched.
+const alertPage = (alert, confirmed) => `<!doctype html><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1"><title>Lipad fare alerts</title>
 <link rel="stylesheet" href="/styles.css"><body><main class="wrap prose" style="padding:48px 20px">
-<h1>${!found ? "That link has expired" : confirmed ? "Alert confirmed" : "Alert removed"}</h1>
-<p>${!found
-  ? "It may already have been used, or the alert was removed."
+<h1>${!alert ? "That link has expired" : confirmed ? "✓ Alert confirmed" : "Alert removed"}</h1>
+<p>${!alert
+  ? "It may already have been used, or the alert was removed. You can always set up a new one."
   : confirmed
-    ? "We'll email you when a fare drops below your target. Prices move fast, so act quickly when one lands."
+    ? "We're watching for this trip and will email you as soon as a matching fare appears."
     : "You won't get any more emails about this alert."}</p>
-<p><a href="/">← Back to Lipad</a></p></main>`;
+${alert && confirmed
+  ? `<p style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px"><b>${fareAlerts.describe(alert)}</b></p>
+<p>Prices move fast, so act quickly when one lands.</p>`
+  : ""}
+<p><a href="/alerts.html">Set up another alert</a> · <a href="/">See what's cheap right now</a></p></main>`;
 
 http.createServer((req, res) => {
   const url = new URL(req.url, "http://localhost");
@@ -607,15 +624,14 @@ http.createServer((req, res) => {
   if (url.pathname.startsWith("/api/admin/")) return void handleAdmin(req, res, url);
   if (url.pathname === "/api/alerts/status") return sendJson(res, Promise.resolve({ enabled: fareAlerts.enabled() }));
   if (url.pathname === "/api/alerts") return void handleAlertSignup(req, res);
+  if (url.pathname === "/api/alerts/resend") return void handleAlertResend(req, res);
   if (url.pathname === "/alerts/confirm" || url.pathname === "/alerts/unsubscribe") {
     const confirmed = url.pathname.endsWith("confirm");
-    const job = confirmed
+    const alert = confirmed
       ? fareAlerts.confirm(url.searchParams.get("t"))
-      : Promise.resolve(fareAlerts.unsubscribe(url.searchParams.get("t")));
-    job.then((done) => {
-      res.writeHead(done ? 200 : 404, { "Content-Type": TYPES[".html"] });
-      res.end(alertPage(done, confirmed));
-    }).catch((e) => { console.error(e); res.writeHead(500).end("Something went wrong."); });
+      : fareAlerts.unsubscribe(url.searchParams.get("t"));
+    res.writeHead(alert ? 200 : 404, { "Content-Type": TYPES[".html"] });
+    res.end(alertPage(alert, confirmed));
     return;
   }
 

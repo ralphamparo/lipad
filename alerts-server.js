@@ -132,6 +132,7 @@ async function subscribe(input) {
     console.error("confirmation email failed for", alert.email, "-", e.message);
     throw new Error("We couldn't send the confirmation email. Check the address and try again.");
   }
+  alert.lastConfirmSent = Date.now();
   alerts.push(alert);
   save();
   return { ok: true };
@@ -142,36 +143,39 @@ async function sendConfirmation(alert, link) {
     to: alert.email,
     subject: "Confirm your Lipad fare alert",
     text: `Confirm this alert to start receiving deals:\n${describe(alert)}\n\n${link}\n\nIf you didn't ask for this, ignore this email and nothing will be sent.`,
-    html: shell(`<p>One click and we'll start watching for this trip:</p>
-      <p style="background:#f6f3ee;border-radius:10px;padding:12px 14px"><b>${describe(alert)}</b></p>
-      <p><a href="${link}" style="background:#0b3d91;color:#fff;text-decoration:none;padding:11px 20px;border-radius:999px;display:inline-block;font-weight:600">Confirm this alert</a></p>
+    // Big, full-width button with the link spelled out underneath: phone clients often shrink
+    // styled links, and some strip the styling altogether.
+    html: shell(`<p style="font-size:17px;margin:0 0 6px"><b>One tap and we'll start watching this trip:</b></p>
+      <p style="background:#f6f3ee;border-radius:10px;padding:12px 14px;margin:0 0 20px">${describe(alert)}</p>
+      <a href="${link}" style="background:#0b3d91;color:#ffffff;text-decoration:none;padding:16px 24px;border-radius:12px;display:block;text-align:center;font-weight:700;font-size:18px;line-height:1.2">Confirm this alert →</a>
+      <p style="color:#667085;font-size:13px;margin:14px 0 0">Button not working? Paste this into your browser:<br>
+        <span style="word-break:break-all;color:#0b3d91">${link}</span></p>
       <p style="color:#667085;font-size:13px">If you didn't ask for this, ignore this email — nothing more will be sent.</p>`),
   });
 }
 
-// Confirming turns the alert on and tells them what they'll receive.
-async function confirm(id) {
+// Confirming turns the alert on. No second email: the confirmation page says what's being
+// watched, and an extra message is one more thing for a spam filter to judge.
+function confirm(id) {
   const a = alerts.find((x) => x.id === id);
   if (!a) return null;
-  const wasNew = !a.confirmed;
   a.confirmed = true;
   save();
-  if (wasNew) {
-    try {
-      await sendEmail({
-        to: a.email,
-        subject: "You're all set — we're watching for your trip",
-        text: `Your alert is live:\n${describe(a)}\n\nWe check prices through the day and will email you when a matching fare appears. Stop anytime: ${SITE}/alerts/unsubscribe?t=${a.id}`,
-        html: shell(`<p><b>Your alert is live.</b> We check prices through the day and will email you as soon as a matching fare appears.</p>
-          <p style="background:#f6f3ee;border-radius:10px;padding:12px 14px">${describe(a)}</p>
-          <p>In the meantime, <a href="${SITE}/">see what's cheap right now</a>.</p>
-          <p style="color:#667085;font-size:13px"><a href="${SITE}/alerts/unsubscribe?t=${a.id}">Stop this alert</a> at any time.</p>`),
-      });
-    } catch (e) {
-      console.error("welcome email failed:", e.message);
-    }
-  }
   return a;
+}
+
+const RESEND_GAP_MS = 5 * 60 * 1000;
+async function resend(email) {
+  const who = String(email || "").trim().toLowerCase();
+  const pending = alerts.filter((a) => a.email === who && !a.confirmed);
+  // Say the same thing either way, so this cannot be used to find out who has signed up.
+  if (!pending.length) return { ok: true };
+  const a = pending[pending.length - 1];
+  if (Date.now() - (a.lastConfirmSent || 0) < RESEND_GAP_MS) return { ok: true };
+  a.lastConfirmSent = Date.now();
+  save();
+  await sendConfirmation(a, `${SITE}/alerts/confirm?t=${a.id}`);
+  return { ok: true };
 }
 
 function unsubscribe(id) {
@@ -254,4 +258,4 @@ function start(getDeals) {
 
 const stats = () => ({ total: alerts.length, confirmed: alerts.filter((a) => a.confirmed).length });
 
-module.exports = { enabled, subscribe, confirm, unsubscribe, check, start, stats, describe };
+module.exports = { enabled, subscribe, resend, confirm, unsubscribe, check, start, stats, describe };
