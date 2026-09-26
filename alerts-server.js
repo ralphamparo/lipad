@@ -124,10 +124,20 @@ async function subscribe(input) {
   };
   if (alert.trip === "oneway") { alert.minNights = 0; alert.maxNights = 0; }
 
+  const link = `${SITE}/alerts/confirm?t=${alert.id}`;
+  // Send first: if the email can't go out, there's no point keeping an alert nobody can confirm.
+  try {
+    await sendConfirmation(alert, link);
+  } catch (e) {
+    console.error("confirmation email failed for", alert.email, "-", e.message);
+    throw new Error("We couldn't send the confirmation email. Check the address and try again.");
+  }
   alerts.push(alert);
   save();
+  return { ok: true };
+}
 
-  const link = `${SITE}/alerts/confirm?t=${alert.id}`;
+async function sendConfirmation(alert, link) {
   await sendEmail({
     to: alert.email,
     subject: "Confirm your Lipad fare alert",
@@ -137,7 +147,6 @@ async function subscribe(input) {
       <p><a href="${link}" style="background:#0b3d91;color:#fff;text-decoration:none;padding:11px 20px;border-radius:999px;display:inline-block;font-weight:600">Confirm this alert</a></p>
       <p style="color:#667085;font-size:13px">If you didn't ask for this, ignore this email — nothing more will be sent.</p>`),
   });
-  return { ok: true };
 }
 
 // Confirming turns the alert on and tells them what they'll receive.
