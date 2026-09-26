@@ -385,6 +385,12 @@ async function getDeals(params) {
 // of every fare we hold for it, and call the big gaps sales.
 const MIN_SAMPLES = 4; // fewer than this and the "typical" price is guesswork
 const MIN_DISCOUNT = 0.25;
+// "Piso fare" level: an airline's ₱1 base fare still carries taxes, and those scale with distance —
+// about ₱800 to Tacloban, ₱1,300 to Davao, more abroad. So rather than one peso figure, we call it
+// a piso fare when a route is within a whisker of the cheapest we have ever seen it, and far below
+// what it normally costs.
+const PISO_OF_FLOOR = 1.12;
+const PISO_OF_TYPICAL = 0.62;
 
 function median(nums) {
   const s = [...nums].sort((a, b) => a - b);
@@ -392,7 +398,7 @@ function median(nums) {
   return s.length % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2;
 }
 
-async function getSales(params) {
+async function getSales(params, mode = "sale") {
   const sweep = await getSweep(params);
   const routes = new Map();
   for (const d of sweep.rows) {
@@ -412,12 +418,20 @@ async function getSales(params) {
     if (!inRange.length) continue;
     const best = inRange.reduce((a, b) => (b.price < a.price ? b : a));
     const discount = 1 - best.price / typical;
-    if (discount < MIN_DISCOUNT) continue;
-    sales.push({ ...best, nights: nightsOf(best), typical: Math.round(typical), discount: +(discount * 100).toFixed(0), samples: fares.length });
+    const floor = Math.min(...fares.map((f) => f.price));
+    if (mode === "piso") {
+      // Near this route's own floor, and well under its normal price.
+      if (best.price > floor * PISO_OF_FLOOR || best.price > typical * PISO_OF_TYPICAL) continue;
+    } else if (discount < MIN_DISCOUNT) continue;
+    sales.push({
+      ...best, nights: nightsOf(best), typical: Math.round(typical), floor: Math.round(floor),
+      discount: +(discount * 100).toFixed(0), samples: fares.length,
+    });
   }
 
-  // Biggest drops first, and only the ones worth a traveller's attention.
-  sales.sort((a, b) => b.discount - a.discount || a.price - b.price);
+  // Sales lead with the biggest drop; piso-level fares lead with the cheapest in pesos, because
+  // that's what someone hunting a piso fare is actually after.
+  sales.sort(mode === "piso" ? (a, b) => a.price - b.price : (a, b) => b.discount - a.discount || a.price - b.price);
   return { demo: sweep.demo, error: sweep.error, updatedAt: sweep.at, params, deals: sales.slice(0, 120) };
 }
 
@@ -507,7 +521,7 @@ function prewarm() {
 }
 prewarm();
 setInterval(prewarm, CACHE_MS - 60 * 1000).unref();
-fareAlerts.start({ getDeals, getSales });
+fareAlerts.start({ getDeals, getSales, getPiso: (p) => getSales(p, "piso") });
 
 // ---------- your own ads ----------
 // Constant-time compare so the password can't be guessed by timing the response.
@@ -608,7 +622,7 @@ http.createServer((req, res) => {
   const url = new URL(req.url, "http://localhost");
   if (url.pathname === "/api/deals") return sendJson(res, getDeals(parseParams(url)));
   if (url.pathname === "/api/lows") return sendJson(res, getLows(parseParams(url), url.searchParams.get("unit") === "week" ? "week" : "month"));
-  if (url.pathname === "/api/sales") return sendJson(res, getSales(parseParams(url)));
+  if (url.pathname === "/api/sales") return sendJson(res, getSales(parseParams(url), url.searchParams.get("mode") === "piso" ? "piso" : "sale"));
   if (url.pathname === "/api/destinations") return sendJson(res, getDestinations(parseParams(url)));
   if (url.pathname === "/api/ads") {
     const placements = (url.searchParams.get("placements") || "").split(",").filter((p) => ownAds.PLACEMENTS.includes(p));

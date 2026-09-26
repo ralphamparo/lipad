@@ -70,9 +70,11 @@ function updateSummary() {
   bits.push(d.from ? (d.from === d.to ? `departing ${prettyDay(d.from)}` : `departing ${prettyDay(d.from)} – ${prettyDay(d.to)}`) : "any time in the next 12 months");
   if (state.trip === "round" && $("stay").value) bits.push(`${$("stay").value.replace("-", "–")} night stays`);
   if ($("direct").checked) bits.push("direct only");
-  bits.push(state.kind === "sale"
-    ? `whenever a fare is at least ${$("discount").value}% below its usual price`
-    : $("price").value ? `under ${peso($("price").value)}` : "whenever the price drops");
+  bits.push(state.kind === "piso"
+    ? "whenever it hits piso-fare level — as cheap as that route ever gets"
+    : state.kind === "sale"
+      ? `whenever a fare is at least ${$("discount").value}% below its usual price`
+      : $("price").value ? `under ${peso($("price").value)}` : "whenever the price drops");
   $("summary").textContent = `We'll watch: ${bits.join(", ")}.`;
   if (chosen.from && !$("price").dataset.touched) $("price").placeholder = `any price — cheapest lately ${peso(chosen.from)}`;
 }
@@ -125,15 +127,16 @@ $("kind").addEventListener("click", (e) => {
   const b = e.target.closest("button");
   if (!b) return;
   setSeg("kind", b.dataset.v, "kind");
-  $("priceField").hidden = b.dataset.v === "sale";
+  $("priceField").hidden = b.dataset.v !== "price";
   $("discountField").hidden = b.dataset.v !== "sale";
+  $("pisoNote").hidden = b.dataset.v !== "piso";
   updateSummary();
 });
 
 // One tap to set up the alerts people actually ask for. A true ₱1 base fare lands around
 // ₱500–1,500 once taxes are in, so the piso watch uses a realistic all-in ceiling.
 const QUICK = {
-  piso: { dest: "Philippines", kind: "price", price: "1499", trip: "oneway" },
+  piso: { dest: "", kind: "piso", trip: "oneway" },
   sale: { dest: "", kind: "sale", discount: "40" },
   asia: { dest: "Southeast Asia", kind: "price", price: "5000" },
 };
@@ -180,7 +183,7 @@ $("form").addEventListener("submit", async (e) => {
         direct: $("direct").checked,
         kind: state.kind,
         minDiscount: $("discount").value,
-        maxPrice: state.kind === "sale" ? "" : $("price").value,
+        maxPrice: state.kind === "price" ? $("price").value : "",
       }),
     });
     const data = await res.json();

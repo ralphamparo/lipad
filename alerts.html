@@ -105,6 +105,7 @@
         <div class="seg" role="radiogroup" id="kind">
           <button type="button" role="radio" data-v="price" aria-checked="true">It is under a price</button>
           <button type="button" role="radio" data-v="sale" aria-checked="false">It is a seat sale</button>
+          <button type="button" role="radio" data-v="piso" aria-checked="false">It is piso-fare level</button>
         </div>
       </div>
       <label class="field narrow" id="priceField">
@@ -132,6 +133,7 @@
         <button class="primary" type="submit">Create alert</button>
         <span class="alert-msg" id="msg"></span>
       </div>
+      <p class="hint" id="pisoNote" hidden>A ₱1 base fare still carries taxes — about ₱800 to Tacloban, ₱1,300 to Davao, more for international. So we watch each route's own floor and tell you when it gets that cheap, wherever you're flying to.</p>
       <p class="hint" id="summary"></p>
       <div class="sent-note" id="sent" hidden>
         <b>Check your inbox.</b> Click the link in the email to start the alert — nothing is sent until you do.

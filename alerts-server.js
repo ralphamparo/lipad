@@ -67,7 +67,8 @@ function describe(a) {
   else bits.push("any dates in the next 12 months");
   if (a.minNights) bits.push(`${a.minNights}–${a.maxNights} night stays`);
   if (a.direct) bits.push("direct flights only");
-  if (a.kind === "sale") bits.push(`whenever a fare is at least ${a.minDiscount}% below its usual price`);
+  if (a.kind === "piso") bits.push("whenever it hits piso-fare level — as cheap as that route ever gets");
+  else if (a.kind === "sale") bits.push(`whenever a fare is at least ${a.minDiscount}% below its usual price`);
   else bits.push(a.maxPrice ? `under ${peso(a.maxPrice)}` : "whenever the price drops");
   return bits.join(", ");
 }
@@ -100,7 +101,7 @@ async function subscribe(input) {
   if (scope !== "any" && !scopeValue) throw new Error("Pick a destination, or choose anywhere.");
   if (scope === "city" && !/^[A-Z]{3}$/.test(scopeValue)) throw new Error("That city isn't one we have fares for.");
 
-  const kind = input.kind === "sale" ? "sale" : "price";
+  const kind = ["sale", "piso"].includes(input.kind) ? input.kind : "price";
   const minDiscount = Math.min(80, Math.max(15, Math.round(Number(input.minDiscount) || 30)));
   const price = input.maxPrice === "" || input.maxPrice == null ? 0 : Math.round(Number(input.maxPrice));
   if (price && (price < 500 || price > 500000)) throw new Error("Pick a target price between ₱500 and ₱500,000.");
@@ -205,7 +206,9 @@ const matchesScope = (d, a) =>
 
 // getDeals is injected so this file doesn't reach into the fare cache itself.
 async function check(providers) {
-  const { getDeals, getSales } = typeof providers === "function" ? { getDeals: providers, getSales: providers } : providers;
+  const { getDeals, getSales, getPiso } = typeof providers === "function"
+    ? { getDeals: providers, getSales: providers, getPiso: providers }
+    : providers;
   if (!enabled()) return { checked: 0, sent: 0 };
   const now = Date.now();
   let sent = 0;
@@ -213,7 +216,7 @@ async function check(providers) {
 
   for (const a of due) {
     try {
-      const source = a.kind === "sale" ? getSales : getDeals;
+      const source = a.kind === "piso" ? getPiso : a.kind === "sale" ? getSales : getDeals;
       const { deals } = await source({
         origin: a.origin,
         oneWay: a.trip === "oneway",
@@ -228,8 +231,8 @@ async function check(providers) {
       const hit = matching[0];
       if (!hit) continue;
       // With a target price: anything under it. Without one: only a genuine drop on what we last sent.
-      const worth = a.kind === "sale" ? true : (a.maxPrice ? hit.price <= a.maxPrice : true);
-      const staleRepeat = a.kind === "sale" ? a.lastPrice === hit.price : (a.lastPrice && hit.price >= a.lastPrice);
+      const worth = a.kind !== "price" ? true : (a.maxPrice ? hit.price <= a.maxPrice : true);
+      const staleRepeat = a.kind === "price" ? (a.lastPrice && hit.price >= a.lastPrice) : a.lastPrice === hit.price;
       if (!worth || staleRepeat) continue;
 
       const link = hit.link.replace("{adults}%20adults", "1%20adult").replace("{adults}", "1");
@@ -238,7 +241,9 @@ async function check(providers) {
       const when = `${pretty(day(hit.departAt))}${hit.returnAt ? ` → ${pretty(day(hit.returnAt))}` : ""}`;
       await sendEmail({
         to: a.email,
-        subject: a.kind === "sale"
+        subject: a.kind === "piso"
+          ? `Piso-fare level: ${peso(hit.price)} to ${hit.destinationName}`
+          : a.kind === "sale"
           ? `${hit.discount}% off: ${peso(hit.price)} to ${hit.destinationName}`
           : `${peso(hit.price)} to ${hit.destinationName}${a.maxPrice ? ` — under your ${peso(a.maxPrice)}` : " — price dropped"}`,
         text: `${hit.origin} → ${hit.destination} (${hit.destinationName}, ${hit.countryName}) for ${peso(hit.price)}\n${when} · ${hit.airlineName}\n\nSee it: ${link}\n\nYour alert: ${describe(a)}\nStop these emails: ${stop}`,
